@@ -46,5 +46,34 @@ def test_toy_multiclass_example():
     u.check_close(losses, golden_losses)
 
 
+def test_d10_example():
+    A = np.load('data/d10-A.npy')
+    Y = np.load('data/d10-Y.npy')
+
+    (m, n) = A.shape
+    (m0, c) = Y.shape
+    assert m0 == m
+
+    W0 = np.zeros((n, c))
+    def getLoss(): return np.linalg.norm(A@W-Y)**2 / (2*m)
+
+    W = W0
+    losses = [getLoss()]
+
+    golden_losses = [0.0460727, 0.048437, 0.0360559, 0.0472155, 0.046455, 0.0443264]
+    numSteps = len(golden_losses) - 1
+    for i in range(numSteps):
+        idx = i % m
+        a = A[idx:idx+1, :]
+        y = a @ W
+        r = y - Y[idx:idx+1]
+        g = numpy_kron(a.T, r)
+        W = W - g / (a*a).sum()
+        losses.extend([getLoss()])
+
+    u.check_close(golden_losses, losses)
+    print(losses)
+
 if __name__ == '__main__':
-    u.run_all_tests(sys.modules[__name__])
+    test_d10_example()
+    #    u.run_all_tests(sys.modules[__name__])
