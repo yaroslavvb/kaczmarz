@@ -1482,8 +1482,6 @@ def get_param(layer):  # TODO(y): deprecate?
 
 
 global_timeit_dict = {}
-
-
 class timeit:
     """Decorator to measure length of time spent in the block in millis and log
     it to TensorBoard."""
