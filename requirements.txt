@@ -2,7 +2,7 @@
 tensorboard
 wandb
 pytest
-
+numpy
 
 # for loading dataset examples
 pandas

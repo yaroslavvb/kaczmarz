@@ -64,6 +64,13 @@ _numpy_type_map = {
 }
 
 
+
+def from_numpy(x) -> torch.Tensor:
+    if isinstance(x, torch.Tensor):
+        return x
+    else:
+        return torch.tensor(x)
+
 def pytorch_dtype_to_floating_numpy_dtype(dtype):
     """Converts PyTorch dtype to numpy floating point dtype, defaulting to np.float32 for non-floating point types."""
     if dtype == torch.float64:
@@ -202,7 +209,7 @@ def kron(a: Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]], b: Optional[
     if result.is_contiguous():
         return result.view(a.size(0) * b.size(0), a.size(1) * b.size(1))
     else:
-        print("Warning kronecker product not contiguous, using reshape")
+        # print("Warning kronecker product not contiguous, using reshape")
         return result.reshape(a.size(0) * b.size(0), a.size(1) * b.size(1))
 
 def run_all_tests(module: nn.Module):
