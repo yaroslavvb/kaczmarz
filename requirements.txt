@@ -1,4 +1,12 @@
-attrdict
+# very slow, maybe delete
 tensorboard
 wandb
 pytest
+
+
+# for loading dataset examples
+pandas
+ucimlrepo
+
+# for Mathematica comms
+pyzmq

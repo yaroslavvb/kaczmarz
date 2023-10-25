@@ -12,7 +12,7 @@ from typing import List
 
 import six
 import wandb
-from attrdict import AttrDict
+
 from torch.utils import tensorboard
 
 import globals as gl
@@ -2750,7 +2750,7 @@ def randomly_rotate(X: torch.Tensor) -> torch.Tensor:
 
     d, n = X.shape
     z = torch.randn((d, d), dtype=X.dtype)
-    q, r = torch.qr(z)
+    q, r = torch.linalg.qr(z)
     d = torch.diag(r)
     ph = d / abs(d)
     rot_mat = q * ph
@@ -2920,16 +2920,6 @@ class MyList:
 
     def value(self):
         return self.storage
-
-
-def divide_attributes(d: dict, n):
-    """Helper util to divide all tensor attributes of d by n, return result as new AttrDict"""
-
-    result = AttrDict()
-    for val in d:
-        if type(d[val]) == torch.Tensor:
-            result[val] = d[val] / n
-    return result
 
 
 def make_square(t: torch.Tensor):
