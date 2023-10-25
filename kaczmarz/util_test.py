@@ -17,7 +17,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.datasets as datasets
-import wandb
+# import wandb
 from PIL import Image
 from torch.utils import tensorboard
 
@@ -41,6 +41,13 @@ def test_kron():
     u.check_close(a.flatten().norm() * b.flatten().norm(), Ck.flatten().norm())
 
     u.check_close(Ck.norm(), 4 * math.sqrt(11635.))
+
+def test_checkequal():
+    with pytest.raises(AssertionError):
+        u.check_equal([1], [[1]])
+
+    u.check_equal(1, 1)
+    u.check_equal(1, 1.)
 
 
 if __name__ == '__main__':

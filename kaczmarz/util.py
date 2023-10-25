@@ -21,6 +21,7 @@ import globals as gl
 # to enable referring to functions in its own module as u.func
 u = sys.modules[__name__]
 
+
 def log_scalars(metrics: Dict[str, Any]) -> None:
     assert gl.event_writer is not None, "initialize event_writer as gl.event_writer = SummaryWriter(logdir)"
     for tag in metrics:
@@ -31,6 +32,8 @@ def log_scalars(metrics: Dict[str, Any]) -> None:
 
 
 global_timeit_dict = {}
+
+
 class timeit:
     """Decorator to measure length of time spent in the block in millis and log
     it to TensorBoard."""
@@ -64,12 +67,12 @@ _numpy_type_map = {
 }
 
 
-
 def from_numpy(x) -> torch.Tensor:
     if isinstance(x, torch.Tensor):
         return x
     else:
         return torch.tensor(x)
+
 
 def pytorch_dtype_to_floating_numpy_dtype(dtype):
     """Converts PyTorch dtype to numpy floating point dtype, defaulting to np.float32 for non-floating point types."""
@@ -120,8 +123,10 @@ def to_numpy(x, dtype: np.dtype = None) -> np.ndarray:
         return result.astype(pytorch_dtype_to_floating_numpy_dtype(torch.get_default_dtype()))
     return result
 
+
 def to_numpys(*xs, dtype=np.float32):
     return (to_numpy(x, dtype) for x in xs)
+
 
 def check_close_reshape(a0, b0, *args, **kwargs) -> None:
     check_close(a0, b0.reshape(a0.shape), *args, **kwargs)
@@ -132,6 +137,7 @@ def check_close(a0, b0, rtol=1e-5, atol=1e-8, label: str = '') -> None:
     """Convenience method for check_equal with tolerances defaulting to typical errors observed in neural network
     ops in float32 precision."""
     return check_equal(a0, b0, rtol=rtol, atol=atol, label=label)
+
 
 def check_equal(observed, truth, rtol=1e-9, atol=1e-12, label: str = '') -> None:
     """
@@ -147,11 +153,13 @@ def check_equal(observed, truth, rtol=1e-9, atol=1e-12, label: str = '') -> None
     truth = to_numpy(truth)
     observed = to_numpy(observed)
 
+    assert observed.shape == truth.shape, "Shapes don't match"
     # broadcast to match shapes if necessary
-    if observed.shape != truth.shape:
-        #        common_shape = (np.zeros_like(observed) + np.zeros_like(truth)).shape
-        truth = truth + np.zeros_like(observed)
-        observed = observed + np.zeros_like(truth)
+    #  if observed.shape != truth.shape:
+    #
+    #        common_shape = (np.zeros_like(observed) + np.zeros_like(truth)).shape
+    # truth = truth + np.zeros_like(observed)
+    # observed = observed + np.zeros_like(truth)
 
     assert truth.shape == observed.shape, f"Observed shape {observed.shape}, expected shape {truth.shape}"
     # run np.testing.assert_allclose for extra info on discrepancies
@@ -185,6 +193,7 @@ def run_all_tests(module: nn.Module):
                 func()
     print(module.__name__ + " tests passed.")
 
+
 def is_vector(dd) -> bool:
     shape = dd.shape
     return len(shape) == 1 and shape[0] >= 1
@@ -211,6 +220,7 @@ def kron(a: Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]], b: Optional[
     else:
         # print("Warning kronecker product not contiguous, using reshape")
         return result.reshape(a.size(0) * b.size(0), a.size(1) * b.size(1))
+
 
 def run_all_tests(module: nn.Module):
     class local_timeit:
