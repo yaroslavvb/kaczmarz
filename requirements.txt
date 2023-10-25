@@ -1,6 +1,6 @@
-# very slow, maybe delete
+# tensorboard very slow to install on MacOS, maybe delete
 tensorboard
-wandb
+# wandb
 pytest
 numpy
 
