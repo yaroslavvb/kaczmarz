@@ -74,6 +74,44 @@ def test_d10_example():
     u.check_close(golden_losses, losses)
     print(losses)
 
+def test_d1000_example():
+    A = np.load('data/d1000-A.npy')
+    Y = np.load('data/d1000-Y.npy')
+
+    (m, n) = A.shape
+    (m0, c) = Y.shape
+    assert m0 == m
+
+    W0 = np.zeros((n, c))
+    def getLoss(W): return np.linalg.norm(A@W-Y)**2 / (2*m)
+
+    golden_losses_kac = [0.00533897, 0.00522692, 0.00513617, 0.00494244, 0.00460737, 0.00421404, 0.00406255, 0.00393202, 0.0039428, 0.00394316]
+    golden_losses_sgd = [0.00533897, 0.00524321, 0.0051401, 0.00494911, 0.00469713, 0.00431367, 0.00419808, 0.00408195, 0.00408793, 0.00406008]
+    numSteps = len(golden_losses_kac) - 1
+    assert len(golden_losses_kac) == len(golden_losses_sgd)
+
+    def run(use_kac):
+        W = W0
+        losses = [getLoss(W)]
+
+        for i in range(numSteps):
+            idx = i % m
+            a = A[idx:idx+1, :]
+            y = a @ W
+            r = y - Y[idx:idx+1]
+            g = numpy_kron(a.T, r)
+            factor = (a*a).sum() if use_kac else 1
+            W = W - g / factor
+            losses.extend([getLoss(W)])
+        return losses
+
+    kac_losses = run(True)
+    sgd_losses = run (False)
+
+    u.check_close(golden_losses_kac, kac_losses)
+    u.check_close(golden_losses_sgd, sgd_losses)
+
 if __name__ == '__main__':
-    test_d10_example()
+    # test_d10_example()
+    test_d1000_example()
     #    u.run_all_tests(sys.modules[__name__])
