@@ -10,3 +10,6 @@ ucimlrepo
 
 # for Mathematica comms
 pyzmq
+
+# for line profiling
+line_profiler

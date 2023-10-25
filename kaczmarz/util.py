@@ -4,29 +4,23 @@ import inspect
 import math
 import os
 import random
-import re
 import sys
 import time
-from typing import Any, Dict, Callable, Optional, Tuple, Union, Sequence, Iterable
+from typing import Any, Dict, Callable, Optional, Tuple, Union
 from typing import List
 
-import six
-import wandb
-
-from torch.utils import tensorboard
-
-import globals as gl
 import numpy as np
 import scipy
 import scipy.linalg as linalg
 import torch
 import torch.nn as nn
-import torchvision.datasets as datasets
-from PIL import Image
-
-import platform
-
 import torch.nn.functional as F
+import torchvision.datasets as datasets
+import wandb
+from PIL import Image
+from torch.utils import tensorboard
+
+import globals as gl
 
 # to enable referring to functions in its own module as u.func
 u = sys.modules[__name__]
@@ -406,7 +400,6 @@ class KronFactoredCov(SpecialForm):
 
     def sigmas_indep(self):
         """Returns number of standard deviations away from independence."""
-        from scipy.stats import chi2
         df = self.a_dim * self.b_dim
         return (self.bartlett() - df) / (4 * np.sqrt(to_numpy(df)))
 
@@ -2192,79 +2185,6 @@ try:
     profile  # throws an exception when profile isn't defined
 except NameError:
     profile = lambda x: x  # if it's not defined simply ignore the decorator.
-
-
-@profile
-def log_spectrum(tag, vals: torch.Tensor, loglog=True, discard_tiny=False, discard_head=0):
-    """Given eigenvalues or singular values in decreasing order, log this plg."""
-
-    if 'darwin' in platform.system().lower():
-        import matplotlib
-        matplotlib.use('PS')
-
-    import matplotlib.pyplot as plt
-
-    if discard_tiny:
-        vals = filter_evals(vals)
-
-    y = vals
-    x = torch.arange(len(vals), dtype=vals.dtype) + 1.
-    if loglog:
-        y = torch.log10(y)
-        x = torch.log10(x)
-
-    if discard_head:
-        if discard_head < len(x):
-            x = x[discard_head:]
-            y = y[discard_head:]
-        else:
-            print(f"warning, tried to discard {discard_head} entries from {len(x)} total")
-
-    fig, ax = plt.subplots()
-    x, y = to_numpys(x, y)
-    markerline, stemlines, baseline = ax.stem(x, y, markerfmt='bo', basefmt='r-', bottom=min(y),
-                                              use_line_collection=True)
-    plt.setp(baseline, color='r', linewidth=2)
-    gl.event_writer.add_figure(tag=tag, figure=fig, global_step=gl.get_global_step())
-
-
-def get_events(fname, x_axis='step'):
-    """Returns event dictionary for given run, has form
-    {tag1: {step1: val1}, tag2: ..}
-
-    If x_axis is set to "time", step is replaced by timestamp
-    """
-
-    from tensorflow.python.summary import summary_iterator  # local import because TF is heavy dep and only used here
-
-    result = {}
-
-    events = summary_iterator.summary_iterator(fname)
-
-    try:
-        for event in events:
-            if x_axis == 'step':
-                x_val = event.step
-            elif x_axis == 'time':
-                x_val = event.wall_time
-            else:
-                assert False, f"Unknown x_axis ({x_axis})"
-
-            vals = {val.tag: val.simple_value for val in event.summary.value}
-            # step_time: valuelayer
-            for tag in vals:
-                event_dict = result.setdefault(tag, {})
-                if x_val in event_dict:
-                    print(f"Warning, overwriting {tag} for {x_axis}={x_val}")
-                    print(f"old val={event_dict[x_val]}")
-                    print(f"new val={vals[tag]}")
-
-                event_dict[x_val] = vals[tag]
-    except Exception as e:
-        print(e)
-        pass
-
-    return result
 
 
 def infinite_iter(obj):
