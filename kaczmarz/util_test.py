@@ -60,6 +60,10 @@ def test_toy_dataset():
     u.check_equal(data, u.from_numpy([[1., 1.]]))
     u.check_equal(targets, u.from_numpy([[3., 5.]]))
 
+def test_least_squares_loss():
+    y = torch.Tensor(u.to_numpy([[0, 0], [0, 0]]))
+    y0 = torch.Tensor(u.to_numpy([[1, 2], [3, 5]]))
+    u.check_equal(u.least_squares_loss(y, y0), 39/4)
 
 if __name__ == '__main__':
     # test_kron()

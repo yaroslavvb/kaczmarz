@@ -47,7 +47,7 @@ def test_toy_multiclass_example():
             W = W - step * g / factor
             losses.extend([getLoss(W)])
         return losses
-    
+
     losses_kac = run(True)
     losses_sgd = run(False)
 
