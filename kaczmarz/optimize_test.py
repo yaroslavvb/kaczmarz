@@ -30,23 +30,32 @@ def test_toy_multiclass_example():
     assert (m, n) == (2, 2)
     W0 = np.zeros((n, c))
 
-    def getLoss():
+    def getLoss(W):
         return np.linalg.norm(A @ W - Y) ** 2 / (2 * m)
 
-    W = W0
-    losses = [getLoss()]
+    def run(use_kac: bool, step = 1.):
+        W = W0
+        losses = [getLoss(W)]
 
-    for i in range(numSteps):
-        idx = i % m
-        a = A[idx:idx + 1, :]
-        y = a @ W
-        r = y - Y[idx:idx + 1]
-        g = numpy_kron(a.T, r)
-        W = W - g / (a * a).sum()
-        losses.extend([getLoss()])
+        for i in range(numSteps):
+            idx = i % m
+            a = A[idx:idx + 1, :]
+            y = a @ W
+            r = y - Y[idx:idx + 1]
+            g = numpy_kron(a.T, r)
+            factor = (a * a).sum() if use_kac else 1
+            W = W - step * g / factor
+            losses.extend([getLoss(W)])
+        return losses
+    
+    losses_kac = run(True)
+    losses_sgd = run(False)
 
-    golden_losses = [39 / 4., 13 / 4., 13 / 16., 13 / 16., 13 / 64., 13 / 64.]
-    u.check_close(losses, golden_losses)
+    golden_losses_kac = [39 / 4., 13 / 4., 13 / 16., 13 / 16., 13 / 64., 13 / 64.]
+    golden_losses_sgd = [39/4, 13/4, 13/2, 0, 0, 0]
+    u.check_close(losses_kac, golden_losses_kac)
+    u.check_close(losses_sgd, golden_losses_sgd)
+
 
 
 def test_d10_example():
