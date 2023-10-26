@@ -49,6 +49,17 @@ def test_checkequal():
     u.check_equal(1, 1)
     u.check_equal(1, 1.)
 
+def test_toy_dataset():
+    dataset = u.ToyDataset()
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
+    train_iter = u.infinite_iter(train_loader)
+
+    data, targets = None, None
+    for i in range(4):
+        data, targets = next(train_iter)
+    u.check_equal(data, u.from_numpy([[1., 1.]]))
+    u.check_equal(targets, u.from_numpy([[3., 5.]]))
+
 
 if __name__ == '__main__':
     # test_kron()

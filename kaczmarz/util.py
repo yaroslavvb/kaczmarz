@@ -167,6 +167,31 @@ def check_equal(observed, truth, rtol=1e-9, atol=1e-12, label: str = '') -> None
         print(f'Numerical testing failed for {label}')
         np.testing.assert_allclose(truth, observed, rtol=rtol, atol=atol, equal_nan=True)
 
+import torch
+import torch.utils.data as data
+
+class ToyDataset(data.Dataset):
+    def __init__(self):
+        super().__init__()
+
+        A = [[1, 0], [1, 1]]
+        Y = [[1, 2], [3, 5]]
+        self.data = torch.tensor(A).type(torch.get_default_dtype())
+        self.targets = torch.tensor(Y).type(torch.get_default_dtype())
+
+    def __getitem__(self, index):
+        return self.data[index], self.targets[index]
+
+    def __len__(self):
+        return len(self.data)
+
+def infinite_iter(obj):
+    """Wraps iterable object to restart on last iteration."""
+
+    while True:
+        for result in iter(obj):
+            yield result
+
 
 def run_all_tests(module: nn.Module):
     class local_timeit:
