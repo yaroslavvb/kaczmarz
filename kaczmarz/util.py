@@ -187,12 +187,10 @@ def least_squares_loss(data: torch.Tensor, targets=None, aggregation='mean'):
     return torch.sum(err * err) / 2 / normalizer
 
 
-class ToyDataset(data.Dataset):
-    def __init__(self):
+class NumpyDataset(data.Dataset):
+    def __init__(self, A, Y):
         super().__init__()
 
-        A = [[1, 0], [1, 1]]
-        Y = [[1, 2], [3, 5]]
         self.data = torch.tensor(A).type(torch.get_default_dtype())
         self.targets = torch.tensor(Y).type(torch.get_default_dtype())
 
@@ -201,6 +199,16 @@ class ToyDataset(data.Dataset):
 
     def __len__(self):
         return len(self.data)
+
+class ToyDataset(NumpyDataset):
+    def __init__(self):
+        A = [[1, 0], [1, 1]]
+        Y = [[1, 2], [3, 5]]
+        super().__init__(A, Y)
+
+    def __len__(self):
+        return len(self.data)
+
 
 def infinite_iter(obj):
     """Wraps iterable object to restart on last iteration."""

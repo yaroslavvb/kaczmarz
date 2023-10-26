@@ -205,6 +205,61 @@ def test_toy_multiclass_pytorch():
 
     u.check_equal([39/4, 13/4, 13/2, 0, 0, 0], losses)
 
+def test_d1000_pytorch():
+    A = np.load('data/d1000-A.npy')
+    Y = np.load('data/d1000-Y.npy')
+    (m, n) = A.shape
+    (m0, c) = Y.shape
+    assert m0 == m
+
+    dataset = u.NumpyDataset(A, Y)
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
+    train_iter = u.infinite_iter(train_loader)
+    test_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
+
+    loss_fn = u.least_squares_loss
+    def getLoss(model):
+        losses = []
+        for data, targets in test_loader:
+            output = model(data)
+            losses.append(loss_fn(output, targets).item())
+        return np.mean(losses)
+
+    golden_losses_kac = [0.00533897, 0.00522692, 0.00513617, 0.00494244, 0.00460737, 0.00421404, 0.00406255, 0.00393202, 0.0039428,
+                         0.00394316]
+    golden_losses_sgd = [0.00533897, 0.00524321, 0.0051401, 0.00494911, 0.00469713, 0.00431367, 0.00419808, 0.00408195, 0.00408793,
+                         0.00406008]
+    num_steps = len(golden_losses_kac) - 1
+    assert len(golden_losses_kac) == len(golden_losses_sgd)
+
+    def run(use_kac):
+        model = u.SimpleFullyConnected([n, c])
+        if use_kac:
+            assert False, "Kacmzarz not implemented"
+        else:
+            optimizer = torch.optim.SGD(model.parameters(), lr=1, momentum=0)
+
+        losses = [getLoss(model)]
+
+        for step in range(num_steps):
+            optimizer.zero_grad()
+            model.zero_grad()
+
+            data, targets = next(train_iter)
+            output = model(data)
+            loss = loss_fn(output, targets)
+            loss.backward()
+            optimizer.step()
+            losses.append(getLoss(model))
+        return losses
+
+    # kac_losses = run(True)
+    sgd_losses = run(False)
+
+    # u.check_close(golden_losses_kac, kac_losses)
+    u.check_close(golden_losses_sgd, sgd_losses)
+
+
 if __name__ == '__main__':
     # test_d10_example()
     test_d1000c_example()
