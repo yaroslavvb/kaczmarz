@@ -167,6 +167,43 @@ def test_d1000c_example():
     u.check_close(golden_losses_kac, kac_losses)
     u.check_close(golden_losses_sgd, sgd_losses)
 
+import torch
+
+def test_toy_multiclass_pytorch():
+    """Test toy multiclass example using PyTorch API"""
+
+    # debugged in kaczmarz-scratch: https://colab.research.google.com/drive/1dGeCen7ikIXcWBbsTtrdQ7NKyJ-iHyUw#scrollTo=W64pkgEvSg01
+    dataset = u.ToyDataset()
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
+    train_iter = u.infinite_iter(train_loader)
+    test_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
+
+    def getLoss(model):
+        losses = []
+        for data, targets in test_loader:
+            output = model(data)
+            losses.append(loss_fn(output, targets).item())
+        return np.mean(losses)
+
+    model = u.SimpleFullyConnected([2, 2])
+    loss_fn = u.least_squares_loss
+    optimizer = torch.optim.SGD(model.parameters(), lr=1, momentum=0)
+
+    num_steps = 5
+
+    losses = [getLoss(model)]
+    for step in range(num_steps):
+        optimizer.zero_grad()
+        model.zero_grad()
+
+        data, targets = next(train_iter)
+        output = model(data)
+        loss = loss_fn(output, targets)
+        loss.backward()
+        optimizer.step()
+        losses.append(getLoss(model))
+
+    u.check_equal([39/4, 13/4, 13/2, 0, 0, 0], losses)
 
 if __name__ == '__main__':
     # test_d10_example()

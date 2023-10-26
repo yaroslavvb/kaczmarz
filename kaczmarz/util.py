@@ -210,6 +210,53 @@ def infinite_iter(obj):
             yield result
 
 
+from typing import Any, Dict, Callable, Optional, Tuple, Union, Sequence, Iterable
+from typing import List
+
+import torch
+import torch.nn as nn
+
+class SimpleFullyConnected(nn.Module):
+    """Simple feedforward network that works on images. """
+
+    layers: List[nn.Module]
+    all_layers: List[nn.Module]
+
+    def __init__(self, d: List[int], nonlin=False, bias=False, last_layer_linear=False):
+        """
+        Feedfoward network of linear layers with optional ReLU nonlinearity. Stores layers in "layers" attr, ie
+        model.layers[0] refers to first linear layer.
+
+        Args:
+            d: list of layer dimensions, ie [768, 20, 10] for MNIST 10-output with hidden layer of 20
+            nonlin: whether to include ReLU nonlinearity
+            last_layer_linear: if True, don't apply nonlinearity to loast layer
+        """
+        super().__init__()
+        self.layers: List[nn.Module] = []
+        self.all_layers: List[nn.Module] = []
+        self.d: List[int] = d
+        for i in range(len(d) - 1):
+            linear = nn.Linear(d[i], d[i + 1], bias=bias)
+
+            # Initialize with zeros
+            linear.weight.data = torch.zeros((d[i + 1], d[i]))
+            if bias:
+                linear.bias.data = torch.zeros(d[i + 1])
+
+            setattr(linear, 'name', f'{i:02d}-linear')
+            self.layers.append(linear)
+            self.all_layers.append(linear)
+            if nonlin:
+                if not last_layer_linear or i < len(d) - 2:
+                    self.all_layers.append(nn.ReLU())
+        self.predict = torch.nn.Sequential(*self.all_layers)
+
+    def forward(self, x: torch.Tensor):
+        x = x.reshape((-1, self.d[0]))
+        return self.predict(x)
+
+
 def run_all_tests(module: nn.Module):
     class local_timeit:
         """Decorator to measure length of time spent in the block in millis and log
