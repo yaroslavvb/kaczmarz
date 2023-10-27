@@ -57,6 +57,51 @@ def test_toy_multiclass_example():
     u.check_close(losses_sgd, golden_losses_sgd)
 
 
+def test_toy_multiclass_bias():
+    # toy multiclass with bias: https://www.wolframcloud.com/obj/yaroslavvb/nn-linear/linear-estimation.nb
+    # toy multiclass with bias: https://colab.research.google.com/drive/1dGeCen7ikIXcWBbsTtrdQ7NKyJ-iHyUw#scrollTo=wHeqLIn3bcNl
+
+    A = np.array([[1, 0, 1], [1, 1, 1]])
+    Y = np.array([[1, 2], [3, 5]])
+
+    print(A)
+    print(Y)
+
+    numSteps = 5
+    (m, n) = A.shape
+    (m0, c) = Y.shape
+
+    W0 = np.zeros((n, c))
+
+    def getLoss(W):
+        return np.linalg.norm(A @ W - Y) ** 2 / (2 * m)
+
+    def run(use_kac: bool, step = 1.):
+        W = W0
+        losses = [getLoss(W)]
+
+        for i in range(numSteps):
+            idx = i % m
+            a = A[idx:idx + 1, :]
+            y = a @ W
+            r = y - Y[idx:idx + 1]
+            g = numpy_kron(a.T, r)
+            factor = (a * a).sum() if use_kac else 1
+            W = W - step * g / factor
+            losses.extend([getLoss(W)])
+        return losses
+
+    losses_kac = run(True)
+    losses_sgd = run(False)
+
+    golden_losses_kac = [39 / 4, 13 / 4, 13 / 9, 13 / 9, 52 / 81, 52 / 81]
+    golden_losses_sgd = [39 / 4, 7 / 4, 33 / 4, 77 / 4, 297 / 4, 109 / 4]
+
+    print("Losses Kaczmarz: ", losses_kac[:5])
+    print("Losses SGD: ", losses_sgd[:5])
+
+    np.testing.assert_allclose(losses_kac, golden_losses_kac, rtol=1e-10, atol=1e-20)
+    np.testing.assert_allclose(losses_sgd, golden_losses_sgd, rtol=1e-10, atol=1e-20)
 
 def test_d10_example():
     A = np.load('data/d10-A.npy')
