@@ -505,8 +505,8 @@ def test_kaczmarz_optimizer():
             losses.append(getLoss(model))
         return losses
 
-    # losses_nobias = optimize(bias=False)
-    # u.check_equal( [39/4., 13/4., 13/16., 13/16., 13/64., 13/64.], losses_nobias)
+    losses_nobias = optimize(bias=False)
+    u.check_equal( [39/4., 13/4., 13/16., 13/16., 13/64., 13/64.], losses_nobias)
 
     losses_bias = optimize(bias=True)
     u.check_close([39/4, 13/4, 13/9, 13/9, 52/81, 52/81], losses_bias)
