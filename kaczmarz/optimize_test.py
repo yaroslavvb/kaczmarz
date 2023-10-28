@@ -1,9 +1,17 @@
 import numpy as np
 
 import util as u
+from torch import nn
 
 import sys
 
+from contextlib import contextmanager
+from typing import Callable, Tuple
+
+import torch
+import torch.nn as nn
+
+import numpy as np
 
 def numpy_kron(a, b):
     result = u.kron(u.from_numpy(a), u.from_numpy(b))
@@ -33,7 +41,7 @@ def test_toy_multiclass_example():
     def getLoss(W):
         return np.linalg.norm(A @ W - Y) ** 2 / (2 * m)
 
-    def run(use_kac: bool, step = 1.):
+    def run(use_kac: bool, step=1.):
         W = W0
         losses = [getLoss(W)]
 
@@ -52,7 +60,7 @@ def test_toy_multiclass_example():
     losses_sgd = run(False)
 
     golden_losses_kac = [39 / 4., 13 / 4., 13 / 16., 13 / 16., 13 / 64., 13 / 64.]
-    golden_losses_sgd = [39/4, 13/4, 13/2, 0, 0, 0]
+    golden_losses_sgd = [39 / 4, 13 / 4, 13 / 2, 0, 0, 0]
     u.check_close(losses_kac, golden_losses_kac)
     u.check_close(losses_sgd, golden_losses_sgd)
 
@@ -76,7 +84,7 @@ def test_toy_multiclass_with_bias():
     def getLoss(W):
         return np.linalg.norm(A @ W - Y) ** 2 / (2 * m)
 
-    def run(use_kac: bool, step = 1.):
+    def run(use_kac: bool, step=1.):
         W = W0
         losses = [getLoss(W)]
 
@@ -102,6 +110,7 @@ def test_toy_multiclass_with_bias():
 
     np.testing.assert_allclose(losses_kac, golden_losses_kac, rtol=1e-10, atol=1e-20)
     np.testing.assert_allclose(losses_sgd, golden_losses_sgd, rtol=1e-10, atol=1e-20)
+
 
 def test_d10_example():
     A = np.load('data/d10-A.npy')
@@ -212,7 +221,9 @@ def test_d1000c_example():
     u.check_close(golden_losses_kac, kac_losses)
     u.check_close(golden_losses_sgd, sgd_losses)
 
+
 import torch
+
 
 def test_toy_multiclass_pytorch():
     """Test toy multiclass example using PyTorch API"""
@@ -248,7 +259,8 @@ def test_toy_multiclass_pytorch():
         optimizer.step()
         losses.append(getLoss(model))
 
-    u.check_equal([39/4, 13/4, 13/2, 0, 0, 0], losses)
+    u.check_equal([39 / 4, 13 / 4, 13 / 2, 0, 0, 0], losses)
+
 
 def test_d1000_pytorch():
     A = np.load('data/d1000-A.npy')
@@ -263,6 +275,7 @@ def test_d1000_pytorch():
     test_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
 
     loss_fn = u.least_squares_loss
+
     def getLoss(model):
         losses = []
         for data, targets in test_loader:
@@ -304,6 +317,100 @@ def test_d1000_pytorch():
     # u.check_close(golden_losses_kac, kac_losses)
     u.check_close(golden_losses_sgd, sgd_losses)
 
+
+def test_manual_optimizer():
+    """Use SGD optimizer, but substitute manual gradient computation"""
+    device = 'cpu'
+
+    dataset = u.ToyDataset()
+    train_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
+    train_iter = u.infinite_iter(train_loader)
+
+    test_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
+    test_iter = iter(test_loader)
+
+    loss_fn = u.least_squares_loss
+
+    d = 2
+    layer = nn.Linear(d, d, bias=False)
+    layer.weight.data.copy_(0 * torch.eye(d))
+    model = torch.nn.Sequential(layer).to(device)
+
+    def getLoss(model):
+        losses = []
+        for data, targets in test_loader:
+            output = model(data)
+            losses.append(loss_fn(output, targets).item())
+        return np.mean(losses)
+
+    optimizer = torch.optim.SGD(model.parameters(), lr=1, momentum=0)
+    num_steps = 5
+    print(f'step {-1}: test loss = {getLoss(model)}')
+
+    @contextmanager
+    def module_hook(hook: Callable):
+        handle = nn.modules.module.register_module_forward_hook(hook, always_call=True)
+        yield
+        handle.remove()
+
+    def _layer_type(layer: nn.Module) -> str:
+        return layer.__class__.__name__
+
+    def is_leaf_module(module: nn.Module) -> bool:
+        return len(list(module.children())) == 0
+
+    handles = []
+
+    def manual_grad_linear(layer: nn.Module, inputs: Tuple[torch.Tensor], output: torch.Tensor):
+        # skip over all non-leaf modules, like top-level nn.Sequential
+        if not is_leaf_module(layer):
+            return
+
+        # which one to use?
+        assert _layer_type(layer) == 'Linear', f"Only linear layers supported but got {_layer_type(layer)}"
+        assert layer.__class__ == nn.Linear
+
+        assert len(inputs) == 1, "multi-input layer??"
+        A = inputs[0].detach()
+
+        has_bias = hasattr(layer, 'bias') and layer.bias
+        idx = len(handles)  # idx is used for closure trick to autoremove hook
+
+        def tensor_backwards(B):
+            layer.weight.manual_grad = B.T @ A
+
+            # use notation of "Kaczmarz step-size"/Multiclass Layout
+            # https://notability.com/n/2TQJ3NYAK7If1~xRfL26Ap
+            if has_bias:
+                # B is (m, c) residual matrix
+                layer.bias.manual_grad = B.T.sum(axis=1)
+
+            handles[idx].remove()
+
+        handles.append(output.register_hook(tensor_backwards))
+
+    optimizer = torch.optim.SGD(model.parameters(), lr=1, momentum=0)
+    num_steps = 5
+    print(f'step {-1}: test loss = {getLoss(model)}')
+
+    losses = [getLoss(model)]
+    for step in range(num_steps):
+        optimizer.zero_grad()
+        data, targets = next(train_iter)
+        data = data.to(device)
+        targets = targets.to(device)
+
+        with module_hook(manual_grad_linear):
+            output = model(data)
+
+        loss = loss_fn(output, targets)
+        loss.backward()
+        optimizer.step()
+        # print(f'step {step}: train loss = {loss.item()}')
+        print(f'step {step}: test loss = {getLoss(model)}')
+        losses.append(getLoss(model))
+
+    u.check_equal([39 / 4, 13 / 4, 13 / 2, 0, 0, 0], losses)
 
 if __name__ == '__main__':
     # test_d10_example()
