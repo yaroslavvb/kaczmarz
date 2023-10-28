@@ -6,6 +6,8 @@ import torch.nn as nn
 
 import numpy as np
 
+import util as u
+
 def test_global_forward_hook():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     data = torch.tensor([[1., 0.], [1., 1.]]).to(device)
@@ -29,24 +31,18 @@ def test_global_forward_hook():
 
     model = simple_model(2, 3).to(device)
 
-    @contextmanager
-    def module_hook(hook: Callable):
-        handle = nn.modules.module.register_module_forward_hook(hook, always_call=True)
-        yield
-        handle.remove()
-
-    with module_hook(compute_norms):
+    with u.module_hook(compute_norms):
         outputs = model(data)
 
     np.testing.assert_allclose(model[0].norms2.cpu(), [1, 2])
     np.testing.assert_allclose(model[1].norms2.cpu(), [4, 8])
     np.testing.assert_allclose(model[2].norms2.cpu(), [16, 32])
 
-    print("layer", "norms squared")
-    for name, layer in model.named_modules():
-        if not name:
-            continue
-        print(name, layer.norms2)
+    # print("layer", "norms squared")
+    # for name, layer in model.named_modules():
+    #     if not name:
+    #         continue
+    #    print(name, layer.norms2)
 
 # prototyped in https://colab.research.google.com/drive/1dGeCen7ikIXcWBbsTtrdQ7NKyJ-iHyUw#scrollTo=LDlLyY18-eFa&line=1&uniqifier=1
 # revision: manual grad computation

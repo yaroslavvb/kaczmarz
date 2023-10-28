@@ -16,6 +16,14 @@ import torchvision.datasets as datasets
 from PIL import Image
 from torch.utils import tensorboard
 
+from contextlib import contextmanager
+from typing import Callable, Tuple
+
+import torch
+import torch.nn as nn
+
+import numpy as np
+
 import globals as gl
 
 # to enable referring to functions in its own module as u.func
@@ -317,6 +325,19 @@ def kron(a: Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]], b: Optional[
     else:
         # print("Warning kronecker product not contiguous, using reshape")
         return result.reshape(a.size(0) * b.size(0), a.size(1) * b.size(1))
+
+
+@contextmanager
+def module_hook(hook: Callable):
+    handle = nn.modules.module.register_module_forward_hook(hook, always_call=True)
+    yield
+    handle.remove()
+
+def _layer_type(layer: nn.Module) -> str:
+    return layer.__class__.__name__
+
+def is_leaf_module(module: nn.Module) -> bool:
+    return len(list(module.children())) == 0
 
 
 def run_all_tests(module: nn.Module):
