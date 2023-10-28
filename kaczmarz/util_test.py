@@ -65,6 +65,24 @@ def test_least_squares_loss():
     y0 = torch.Tensor(u.to_numpy([[1, 2], [3, 5]]))
     u.check_equal(u.least_squares_loss(y, y0), 39/4)
 
+def test_simple_fully_connected():
+    net = u.SimpleFullyConnected([28**2, 2, 10], nonlin=True, bias=True, init_scale=1)
+
+    # two linear layers, two relu layers, itself
+    assert len(list(net.named_modules())) == 5
+
+    # just layers with parameters
+    assert len(net.layers) == 2
+
+    # all layers
+    assert len(net.all_layers) == 4
+
+    # dimensions
+    assert net.d == [784, 2, 10]
+
+    image = torch.ones((28, 28))
+    assert net(image).shape == (1, 10)
+    assert torch.allclose(net(image), torch.tensor([[1., 1., 0., 0., 0., 0., 0., 0., 0., 0.]]))
 
 if __name__ == '__main__':
     # test_kron()
