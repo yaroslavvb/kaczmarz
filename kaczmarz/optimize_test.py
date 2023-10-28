@@ -57,7 +57,7 @@ def test_toy_multiclass_example():
     u.check_close(losses_sgd, golden_losses_sgd)
 
 
-def test_toy_multiclass_bias():
+def test_toy_multiclass_with_bias():
     # toy multiclass with bias: https://www.wolframcloud.com/obj/yaroslavvb/nn-linear/linear-estimation.nb
     # toy multiclass with bias: https://colab.research.google.com/drive/1dGeCen7ikIXcWBbsTtrdQ7NKyJ-iHyUw#scrollTo=wHeqLIn3bcNl
 
@@ -280,7 +280,7 @@ def test_d1000_pytorch():
     def run(use_kac):
         model = u.SimpleFullyConnected([n, c])
         if use_kac:
-            assert False, "Kacmzarz not implemented"
+            assert False, "Kaczmarz not implemented"
         else:
             optimizer = torch.optim.SGD(model.parameters(), lr=1, momentum=0)
 

@@ -13,3 +13,5 @@ pyzmq
 
 # for line profiling
 line_profiler
+
+pytorch

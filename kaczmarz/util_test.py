@@ -65,6 +65,7 @@ def test_least_squares_loss():
     y0 = torch.Tensor(u.to_numpy([[1, 2], [3, 5]]))
     u.check_equal(u.least_squares_loss(y, y0), 39/4)
 
+
 if __name__ == '__main__':
     # test_kron()
     u.run_all_tests(sys.modules[__name__])
