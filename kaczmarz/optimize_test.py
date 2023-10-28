@@ -364,39 +364,18 @@ def test_manual_optimizer():
 
         has_bias = hasattr(layer, 'bias') and layer.bias
         idx = len(handles)  # idx is used for closure trick to autoremove hook
-
-        # def tensor_backwards(B):
-        #     # use notation of "Kaczmarz step-size"/Multiclass Layout
-        #     # m datapoints, n features, c output classes
-        #     # https://notability.com/n/2TQJ3NYAK7If1~xRfL26Ap
-        #     norms2 = (A * A).sum(axis=1)
-        #     if hasattr(layer, 'bias'):
-        #         norms2 += 1
-        #     update = torch.einsum('mn,mc,m->nc', A, B, 1 / norms2)
-        #
-        #     layer.weight.weighted_grad = update.T
-        #     if hasattr(layer, 'bias'):
-        #         # B is (m, c) residual matrix
-        #         update = torch.einsum('mc,m->c', B, 1 / norms2)
-        #         layer.bias.weighted_grad = update.T
-        #
-        #     handles[idx].remove()
-
         def tensor_backwards(B):
-            #  layer.weight.manual_grad = B.T @ A
-
+            # use notation of "Kaczmarz step-size"/Multiclass Layout
+            # https://notability.com/n/2TQJ3NYAK7If1~xRfL26Ap
             (m, n) = A.shape
             ones = torch.ones((m)).to(device)
             update = torch.einsum('mn,mc,m->nc', A, B, ones)
-            layer.weight.manual_grad = update.T
+            layer.weight.manual_grad = update.T  # B.T @ A
 
-            # use notation of "Kaczmarz step-size"/Multiclass Layout
-            # https://notability.com/n/2TQJ3NYAK7If1~xRfL26Ap
             if has_bias:
                 # B is (m, c) residual matrix
                 update = torch.einsum('mc,m->c', B, ones)
-                # layer.bias.manual_grad = B.T.sum(axis=1)
-                layer.bias.manual_grad = update.T
+                layer.bias.manual_grad = update.T  # B.T.sum(axis=1)
 
             handles[idx].remove()
 
@@ -425,6 +404,9 @@ def test_manual_optimizer():
         losses.append(getLoss(model))
 
     u.check_equal([39 / 4, 13 / 4, 13 / 2, 0, 0, 0], losses)
+
+    golden_losses_sgd = [39 / 4, 7 / 4, 33 / 4, 77 / 4, 297 / 4, 109 / 4]
+
 
 
 if __name__ == '__main__':
