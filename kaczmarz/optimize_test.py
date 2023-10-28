@@ -321,35 +321,23 @@ def test_d1000_pytorch():
 
 def test_manual_optimizer():
     """Use SGD optimizer, but substitute manual gradient computation"""
-    device = 'cpu'
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     dataset = u.ToyDataset()
-    train_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
-    train_iter = u.infinite_iter(train_loader)
-
     test_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
-    test_iter = iter(test_loader)
-
     loss_fn = u.least_squares_loss
-
-    d = 2
-    layer = nn.Linear(d, d, bias=False)
-    layer.weight.data.copy_(0 * torch.eye(d))
-    model = torch.nn.Sequential(layer).to(device)
 
     def getLoss(model):
         losses = []
         for data, targets in test_loader:
+            data = data.to(device)
+            targets = targets.to(device)
             output = model(data)
             losses.append(loss_fn(output, targets).item())
         return np.mean(losses)
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=1, momentum=0)
-    num_steps = 5
-    print(f'step {-1}: test loss = {getLoss(model)}')
-
+    # forward hook with self-removing backward hook
     handles = []
-
     def manual_grad_linear(layer: nn.Module, inputs: Tuple[torch.Tensor], output: torch.Tensor):
         # skip over all non-leaf modules, like top-level nn.Sequential
         if not u.is_leaf_module(layer):
@@ -362,8 +350,9 @@ def test_manual_optimizer():
         assert len(inputs) == 1, "multi-input layer??"
         A = inputs[0].detach()
 
-        has_bias = hasattr(layer, 'bias') and layer.bias
+        has_bias = hasattr(layer, 'bias') and layer.bias is not None
         idx = len(handles)  # idx is used for closure trick to autoremove hook
+
         def tensor_backwards(B):
             # use notation of "Kaczmarz step-size"/Multiclass Layout
             # https://notability.com/n/2TQJ3NYAK7If1~xRfL26Ap
@@ -375,37 +364,52 @@ def test_manual_optimizer():
             if has_bias:
                 # B is (m, c) residual matrix
                 update = torch.einsum('mc,m->c', B, ones)
-                layer.bias.manual_grad = update.T  # B.T.sum(axis=1)
+                layer.bias.manual_grad = update.T / m  # B.T.sum(axis=1)
 
             handles[idx].remove()
 
         handles.append(output.register_hook(tensor_backwards))
 
-    optimizer = torch.optim.SGD(model.parameters(), lr=1, momentum=0)
-    num_steps = 5
-    print(f'step {-1}: test loss = {getLoss(model)}')
+    def optimize(bias):
+        train_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
+        train_iter = u.infinite_iter(train_loader)
 
-    losses = [getLoss(model)]
-    for step in range(num_steps):
-        optimizer.zero_grad()
-        data, targets = next(train_iter)
-        data = data.to(device)
-        targets = targets.to(device)
+        d = 2
+        layer = nn.Linear(d, d, bias=bias)
+        layer.weight.data.copy_(0 * torch.eye(d))
+        if bias:
+            layer.bias.data.zero_()
+        model = torch.nn.Sequential(layer).to(device)
+        print(f'step {-1}: test loss = {getLoss(model)}')
 
-        with u.module_hook(manual_grad_linear):
-            output = model(data)
+        optimizer = torch.optim.SGD(model.parameters(), lr=1, momentum=0)
+        num_steps = 5
+        print(f'step {-1}: test loss = {getLoss(model)}')
 
-        loss = loss_fn(output, targets)
-        loss.backward()
+        losses = [getLoss(model)]
+        for step in range(num_steps):
+            optimizer.zero_grad()
+            data, targets = next(train_iter)
+            data = data.to(device)
+            targets = targets.to(device)
 
-        model[0].weight.grad = model[0].weight.manual_grad
-        optimizer.step()
-        print(f'step {step}: test loss = {getLoss(model)}')
-        losses.append(getLoss(model))
+            with u.module_hook(manual_grad_linear):
+                output = model(data)
 
-    u.check_equal([39 / 4, 13 / 4, 13 / 2, 0, 0, 0], losses)
+            loss = loss_fn(output, targets)
+            loss.backward()
 
-    golden_losses_sgd = [39 / 4, 7 / 4, 33 / 4, 77 / 4, 297 / 4, 109 / 4]
+            model[0].weight.grad = model[0].weight.manual_grad
+            optimizer.step()
+            print(f'step {step}: test loss = {getLoss(model)}')
+            losses.append(getLoss(model))
+        return losses
+
+    losses_nobias = optimize(bias=False)
+    u.check_equal([39 / 4, 13 / 4, 13 / 2, 0, 0, 0], losses_nobias)
+
+    losses_bias = optimize(bias=True)
+    u.check_equal([39 / 4, 7 / 4, 33 / 4, 77 / 4, 297 / 4, 109 / 4], losses_bias)
 
 
 
