@@ -24,7 +24,6 @@ def test_global_forward_hook():
 
     def compute_norms(layer: nn.Module, inputs: Tuple[torch.Tensor], _output: torch.Tensor):
         assert len(inputs) == 1, "multi-input layer??"
-        print("computing norms")
         A = inputs[0].detach()
         layer.norms2 = (A * A).sum(dim=1)
 
@@ -39,9 +38,9 @@ def test_global_forward_hook():
     with module_hook(compute_norms):
         outputs = model(data)
 
-    np.testing.assert_allclose(model[0].norms2, [1, 2])
-    np.testing.assert_allclose(model[1].norms2, [4, 8])
-    np.testing.assert_allclose(model[2].norms2, [16, 32])
+    np.testing.assert_allclose(model[0].norms2.cpu(), [1, 2])
+    np.testing.assert_allclose(model[1].norms2.cpu(), [4, 8])
+    np.testing.assert_allclose(model[2].norms2.cpu(), [16, 32])
 
     print("layer", "norms squared")
     for name, layer in model.named_modules():
