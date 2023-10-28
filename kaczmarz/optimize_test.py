@@ -13,6 +13,7 @@ import torch.nn as nn
 
 import numpy as np
 
+
 def numpy_kron(a, b):
     result = u.kron(u.from_numpy(a), u.from_numpy(b))
     return u.to_numpy(result)
@@ -347,27 +348,15 @@ def test_manual_optimizer():
     num_steps = 5
     print(f'step {-1}: test loss = {getLoss(model)}')
 
-    @contextmanager
-    def module_hook(hook: Callable):
-        handle = nn.modules.module.register_module_forward_hook(hook, always_call=True)
-        yield
-        handle.remove()
-
-    def _layer_type(layer: nn.Module) -> str:
-        return layer.__class__.__name__
-
-    def is_leaf_module(module: nn.Module) -> bool:
-        return len(list(module.children())) == 0
-
     handles = []
 
     def manual_grad_linear(layer: nn.Module, inputs: Tuple[torch.Tensor], output: torch.Tensor):
         # skip over all non-leaf modules, like top-level nn.Sequential
-        if not is_leaf_module(layer):
+        if not u.is_leaf_module(layer):
             return
 
         # which one to use?
-        assert _layer_type(layer) == 'Linear', f"Only linear layers supported but got {_layer_type(layer)}"
+        assert u._layer_type(layer) == 'Linear', f"Only linear layers supported but got {u._layer_type(layer)}"
         assert layer.__class__ == nn.Linear
 
         assert len(inputs) == 1, "multi-input layer??"
@@ -400,17 +389,19 @@ def test_manual_optimizer():
         data = data.to(device)
         targets = targets.to(device)
 
-        with module_hook(manual_grad_linear):
+        with u.module_hook(manual_grad_linear):
             output = model(data)
 
         loss = loss_fn(output, targets)
         loss.backward()
+
+        model[0].weight.grad = model[0].weight.manual_grad
         optimizer.step()
-        # print(f'step {step}: train loss = {loss.item()}')
         print(f'step {step}: test loss = {getLoss(model)}')
         losses.append(getLoss(model))
 
     u.check_equal([39 / 4, 13 / 4, 13 / 2, 0, 0, 0], losses)
+
 
 if __name__ == '__main__':
     # test_d10_example()
