@@ -365,14 +365,38 @@ def test_manual_optimizer():
         has_bias = hasattr(layer, 'bias') and layer.bias
         idx = len(handles)  # idx is used for closure trick to autoremove hook
 
+        # def tensor_backwards(B):
+        #     # use notation of "Kaczmarz step-size"/Multiclass Layout
+        #     # m datapoints, n features, c output classes
+        #     # https://notability.com/n/2TQJ3NYAK7If1~xRfL26Ap
+        #     norms2 = (A * A).sum(axis=1)
+        #     if hasattr(layer, 'bias'):
+        #         norms2 += 1
+        #     update = torch.einsum('mn,mc,m->nc', A, B, 1 / norms2)
+        #
+        #     layer.weight.weighted_grad = update.T
+        #     if hasattr(layer, 'bias'):
+        #         # B is (m, c) residual matrix
+        #         update = torch.einsum('mc,m->c', B, 1 / norms2)
+        #         layer.bias.weighted_grad = update.T
+        #
+        #     handles[idx].remove()
+
         def tensor_backwards(B):
-            layer.weight.manual_grad = B.T @ A
+            #  layer.weight.manual_grad = B.T @ A
+
+            (m, n) = A.shape
+            ones = torch.ones((m)).to(device)
+            update = torch.einsum('mn,mc,m->nc', A, B, ones)
+            layer.weight.manual_grad = update.T
 
             # use notation of "Kaczmarz step-size"/Multiclass Layout
             # https://notability.com/n/2TQJ3NYAK7If1~xRfL26Ap
             if has_bias:
                 # B is (m, c) residual matrix
-                layer.bias.manual_grad = B.T.sum(axis=1)
+                update = torch.einsum('mc,m->c', B, ones)
+                # layer.bias.manual_grad = B.T.sum(axis=1)
+                layer.bias.manual_grad = update.T
 
             handles[idx].remove()
 
