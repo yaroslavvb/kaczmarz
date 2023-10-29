@@ -21,8 +21,8 @@ def test_toy_multiclass_example():
     # Data gen "Exporting  toy multiclass example to numpy array" of
     # https://www.wolframcloud.com/obj/yaroslavvb/nn-linear/linear-estimation.nb
 
-    A = np.load('data/toy-A.npy')
-    Y = np.load('data/toy-Y.npy')
+    A = np.load('../data/toy-A.npy')
+    Y = np.load('../data/toy-Y.npy')
     print(A)
     print(Y)
 
@@ -109,8 +109,8 @@ def test_toy_multiclass_with_bias():
 
 
 def test_d10_example():
-    A = np.load('data/d10-A.npy')
-    Y = np.load('data/d10-Y.npy')
+    A = np.load('../data/d10-A.npy')
+    Y = np.load('../data/d10-Y.npy')
 
     (m, n) = A.shape
     (m0, c) = Y.shape
@@ -139,8 +139,8 @@ def test_d10_example():
 
 
 def test_d1000_example():
-    A = np.load('data/d1000-A.npy')
-    Y = np.load('data/d1000-Y.npy')
+    A = np.load('../data/d1000-A.npy')
+    Y = np.load('../data/d1000-Y.npy')
 
     (m, n) = A.shape
     (m0, c) = Y.shape
@@ -180,8 +180,8 @@ def test_d1000_example():
 
 
 def test_d1000c_example():
-    A = np.load('data/d1000c-A.npy')
-    Y = np.load('data/d1000c-Y.npy')
+    A = np.load('../data/d1000c-A.npy')
+    Y = np.load('../data/d1000c-Y.npy')
 
     (m, n) = A.shape
     (m0, c) = Y.shape
@@ -259,8 +259,8 @@ def test_toy_multiclass_pytorch():
 
 
 def test_d1000_pytorch():
-    A = np.load('data/d1000-A.npy')
-    Y = np.load('data/d1000-Y.npy')
+    A = np.load('../data/d1000-A.npy')
+    Y = np.load('../data/d1000-Y.npy')
     (m, n) = A.shape
     (m0, c) = Y.shape
     assert m0 == m
@@ -516,8 +516,8 @@ def test_linear_mnist(bias=True):
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,))
     ])
-    dataset1 = datasets.MNIST('data', train=True, download=True, transform=transform)
-    dataset2 = datasets.MNIST('data', train=False, download=True, transform=transform)
+    dataset1 = datasets.MNIST('../data', train=True, download=True, transform=transform)
+    dataset2 = datasets.MNIST('../data', train=False, download=True, transform=transform)
 
     model = u.SimpleFullyConnected([28 ** 2, 10], bias=bias)
     loss_fn = u.least_squares_loss
