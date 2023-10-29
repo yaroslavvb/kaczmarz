@@ -348,6 +348,59 @@ def _layer_type(layer: nn.Module) -> str:
 def is_leaf_module(module: nn.Module) -> bool:
     return len(list(module.children())) == 0
 
+def zero_custom_grad(model):
+    for p in model.parameters():
+        if p.grad is not None:
+            p.grad = None
+
+def copy_custom_grad_to_grad(model: nn.Module) -> None:
+    """for all layers in the model, replaces .grad with .custom_grad"""
+    for p in model.parameters():
+        if hasattr(p, 'custom_grad'):
+            p.grad = p.custom_grad
+        else:
+            assert p.grad is None, "existing grad found, but not replacing it with custom_grad, consider model.zero_grad()"
+
+
+def kaczmarz_grad_linear(layer: nn.Module, inputs: Tuple[torch.Tensor], output: torch.Tensor):
+    """Linear hook for Kaczmarz update"""
+    # skip over all non-leaf modules, like top-level nn.Sequential
+    if not is_leaf_module(layer):
+        return
+
+    # which one to use?
+    assert _layer_type(layer) == 'Linear', f"Only linear layers supported but got {_layer_type(layer)}"
+    assert layer.__class__ == nn.Linear
+
+    assert len(inputs) == 1, "multi-input layer??"
+    A = inputs[0].detach()
+
+    has_bias = hasattr(layer, 'bias') and layer.bias is not None
+
+    def tensor_backwards(B: torch.Tensor):
+        # use notation of "Kaczmarz step-size"/Multiclass Layout
+        # https://notability.com/n/2TQJ3NYAK7If1~xRfL26Ap
+        (m, n) = A.shape
+
+        norms2 = (A * A).sum(axis=1)
+        if has_bias:
+            norms2 += 1
+
+        ones = torch.ones((m,)).to(B.device)
+        # ones = torch.ones_like()
+        update = torch.einsum('mn,mc,m->nc', A, B, ones / norms2)
+        layer.weight.custom_grad = update.T  # B.T @ A
+
+        if has_bias:
+            # B is (m, c) residual matrix
+
+            update = torch.einsum('mc,m->c', B, ones / norms2)
+            layer.bias.custom_grad = update.T / m  # B.T.sum(axis=1)
+
+    existing_hooks = output._backward_hooks
+    assert existing_hooks is None, f"Tensor already has backward hooks, {existing_hooks}, potential bug if we forgot to remove previous hooks"
+    output.register_hook(tensor_backwards)
+
 
 def run_all_tests(module: nn.Module):
     class local_timeit:

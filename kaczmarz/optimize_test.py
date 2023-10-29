@@ -455,13 +455,13 @@ def test_kaczmarz_optimizer():
 
             ones = torch.ones((m,)).to(device)
             update = torch.einsum('mn,mc,m->nc', A, B, ones / norms2)
-            layer.weight.kaczmarz_grad = update.T  # B.T @ A
+            layer.weight.custom_grad = update.T  # B.T @ A
 
             if has_bias:
                 # B is (m, c) residual matrix
 
                 update = torch.einsum('mc,m->c', B, ones / norms2)
-                layer.bias.kaczmarz_grad = update.T / m  # B.T.sum(axis=1)
+                layer.bias.custom_grad = update.T / m  # B.T.sum(axis=1)
 
             handles[idx].remove()
 
@@ -494,9 +494,9 @@ def test_kaczmarz_optimizer():
             loss = loss_fn(output, targets)
             loss.backward()
 
-            model[0].weight.grad = model[0].weight.kaczmarz_grad
+            model[0].weight.grad = model[0].weight.custom_grad
             if bias:
-                model[0].bias.grad = model[0].bias.kaczmarz_grad
+                model[0].bias.grad = model[0].bias.custom_grad
 
             optimizer.step()
             losses.append(getLoss(model))
@@ -541,62 +541,19 @@ def test_linear_mnist(bias=True):
     train_iter = u.infinite_iter(train_loader)
     losses = [getLoss(model)]
 
-    # forward hook with self-removing backward hook
-    handles = []
-
-    def kaczmarz_grad_linear(layer: nn.Module, inputs: Tuple[torch.Tensor], output: torch.Tensor):
-        # skip over all non-leaf modules, like top-level nn.Sequential
-        if not u.is_leaf_module(layer):
-            return
-
-        # which one to use?
-        assert u._layer_type(layer) == 'Linear', f"Only linear layers supported but got {u._layer_type(layer)}"
-        assert layer.__class__ == nn.Linear
-
-        assert len(inputs) == 1, "multi-input layer??"
-        A = inputs[0].detach()
-
-        has_bias = hasattr(layer, 'bias') and layer.bias is not None
-        idx = len(handles)  # idx is used for closure trick to autoremove hook
-
-        def tensor_backwards(B):
-            # use notation of "Kaczmarz step-size"/Multiclass Layout
-            # https://notability.com/n/2TQJ3NYAK7If1~xRfL26Ap
-            (m, n) = A.shape
-
-            norms2 = (A * A).sum(axis=1)
-            if has_bias:
-                norms2 += 1
-
-            ones = torch.ones((m,)).to(device)
-            update = torch.einsum('mn,mc,m->nc', A, B, ones / norms2)
-            layer.weight.kaczmarz_grad = update.T  # B.T @ A
-
-            if has_bias:
-                # B is (m, c) residual matrix
-
-                update = torch.einsum('mc,m->c', B, ones / norms2)
-                layer.bias.kaczmarz_grad = update.T / m  # B.T.sum(axis=1)
-
-            handles[idx].remove()
-
-        handles.append(output.register_hook(tensor_backwards))
-
     for step in range(num_steps):
-        optimizer.zero_grad()
+        model.zero_grad()
+        u.zero_custom_grad(model)
         data, targets = next(train_iter)
         data = data.to(device)
         targets = targets.to(device)
 
-        with u.module_hook(kaczmarz_grad_linear):
+        with u.module_hook(u.kaczmarz_grad_linear):
             output = model(data)
 
         loss = loss_fn(output, targets)
         loss.backward()
-
-        model.layers[0].weight.grad = model.layers[0].weight.kaczmarz_grad
-        if bias:
-            model.layers[0].bias.grad = model.layers[0].bias.kaczmarz_grad
+        u.copy_custom_grad_to_grad(model)
 
         optimizer.step()
         losses.append(getLoss(model))
