@@ -15,3 +15,8 @@ pyzmq
 line_profiler
 
 pytorch
+torchvision
+pillow
+six
+wandb
+scipy

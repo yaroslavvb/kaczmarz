@@ -1,45 +1,13 @@
+from typing import Tuple
+
 import numpy as np
+import torch.nn as nn
+# import wandb
+from torch.utils import tensorboard
+from torchvision import datasets, transforms
 
 import util as u
-from torch import nn
 
-import sys
-
-from contextlib import contextmanager
-from typing import Callable, Tuple
-
-import torch
-import torch.nn as nn
-
-import numpy as np
-
-import inspect
-import math
-import os
-import random
-import sys
-import time
-from typing import Any, Dict, Callable, Optional, Tuple, Union
-from typing import List
-
-import numpy as np
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torchvision.datasets as datasets
-# import wandb
-from PIL import Image
-from torch.utils import tensorboard
-
-from contextlib import contextmanager
-from typing import Callable, Tuple
-
-import torch
-import torch.nn as nn
-
-import numpy as np
-
-from torchvision import datasets, transforms
 
 def numpy_kron(a, b):
     result = u.kron(u.from_numpy(a), u.from_numpy(b))
@@ -365,6 +333,7 @@ def test_manual_optimizer():
 
     # forward hook with self-removing backward hook
     handles = []
+
     def manual_grad_linear(layer: nn.Module, inputs: Tuple[torch.Tensor], output: torch.Tensor):
         # skip over all non-leaf modules, like top-level nn.Sequential
         if not u.is_leaf_module(layer):
@@ -384,7 +353,7 @@ def test_manual_optimizer():
             # use notation of "Kaczmarz step-size"/Multiclass Layout
             # https://notability.com/n/2TQJ3NYAK7If1~xRfL26Ap
             (m, n) = A.shape
-            ones = torch.ones((m)).to(device)
+            ones = torch.ones((m,)).to(device)
             update = torch.einsum('mn,mc,m->nc', A, B, ones)
             layer.weight.manual_grad = update.T  # B.T @ A
 
@@ -459,6 +428,7 @@ def test_kaczmarz_optimizer():
 
     # forward hook with self-removing backward hook
     handles = []
+
     def kaczmarz_grad_linear(layer: nn.Module, inputs: Tuple[torch.Tensor], output: torch.Tensor):
         # skip over all non-leaf modules, like top-level nn.Sequential
         if not u.is_leaf_module(layer):
@@ -484,13 +454,13 @@ def test_kaczmarz_optimizer():
                 norms2 += 1
 
             ones = torch.ones((m,)).to(device)
-            update = torch.einsum('mn,mc,m->nc', A, B, ones/norms2)
+            update = torch.einsum('mn,mc,m->nc', A, B, ones / norms2)
             layer.weight.kaczmarz_grad = update.T  # B.T @ A
 
             if has_bias:
                 # B is (m, c) residual matrix
 
-                update = torch.einsum('mc,m->c', B, ones/norms2)
+                update = torch.einsum('mc,m->c', B, ones / norms2)
                 layer.bias.kaczmarz_grad = update.T / m  # B.T.sum(axis=1)
 
             handles[idx].remove()
@@ -533,10 +503,11 @@ def test_kaczmarz_optimizer():
         return losses
 
     losses_nobias = optimize(bias=False)
-    u.check_equal( [39/4., 13/4., 13/16., 13/16., 13/64., 13/64.], losses_nobias)
+    u.check_equal([39 / 4., 13 / 4., 13 / 16., 13 / 16., 13 / 64., 13 / 64.], losses_nobias)
 
     losses_bias = optimize(bias=True)
-    u.check_close([39/4, 13/4, 13/9, 13/9, 52/81, 52/81], losses_bias)
+    u.check_close([39 / 4, 13 / 4, 13 / 9, 13 / 9, 52 / 81, 52 / 81], losses_bias)
+
 
 def test_linear_mnist(bias=True):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -548,10 +519,10 @@ def test_linear_mnist(bias=True):
     dataset1 = datasets.MNIST('data', train=True, download=True, transform=transform)
     dataset2 = datasets.MNIST('data', train=False, download=True, transform=transform)
 
-    model = u.SimpleFullyConnected([28**2, 10], bias=bias)
+    model = u.SimpleFullyConnected([28 ** 2, 10], bias=bias)
     loss_fn = u.least_squares_loss
 
-    def getLoss(dataset, max_eval_samples = 10):
+    def getLoss(model, max_eval_samples=10):
         test_loader = torch.utils.data.DataLoader(dataset2, batch_size=1, shuffle=False)
         losses = []
         for (i, (data, targets)) in enumerate(test_loader):
@@ -572,6 +543,7 @@ def test_linear_mnist(bias=True):
 
     # forward hook with self-removing backward hook
     handles = []
+
     def kaczmarz_grad_linear(layer: nn.Module, inputs: Tuple[torch.Tensor], output: torch.Tensor):
         # skip over all non-leaf modules, like top-level nn.Sequential
         if not u.is_leaf_module(layer):
@@ -597,13 +569,13 @@ def test_linear_mnist(bias=True):
                 norms2 += 1
 
             ones = torch.ones((m,)).to(device)
-            update = torch.einsum('mn,mc,m->nc', A, B, ones/norms2)
+            update = torch.einsum('mn,mc,m->nc', A, B, ones / norms2)
             layer.weight.kaczmarz_grad = update.T  # B.T @ A
 
             if has_bias:
                 # B is (m, c) residual matrix
 
-                update = torch.einsum('mc,m->c', B, ones/norms2)
+                update = torch.einsum('mc,m->c', B, ones / norms2)
                 layer.bias.kaczmarz_grad = update.T / m  # B.T.sum(axis=1)
 
             handles[idx].remove()
@@ -630,8 +602,11 @@ def test_linear_mnist(bias=True):
         losses.append(getLoss(model))
 
     # [124.54545454545455, 83.3533919971775, 94.94022894752297, 71.47339670631018, 70.7996980888261, 29.232307191255543, 35.90959778157148, 46.41351659731431, 54.23867620820899, 55.18098633710972, 44.854006835682824, 39.05859527533705, 34.10272614522414, 33.8443342582746, 35.933635773983866, 36.40805794434114]
-    golden_losses = [124.54545454545455, 83.3533919971775, 94.94022894752297, 71.47339670631018, 70.7996980888261, 29.232307191255543, 35.90959778157148, 46.41351659731431, 54.23867620820899, 55.18098633710972, 44.854006835682824, 39.05859527533705, 34.10272614522414, 33.8443342582746, 35.933635773983866, 36.40805794434114]
+    golden_losses = [124.54545454545455, 83.3533919971775, 94.94022894752297, 71.47339670631018, 70.7996980888261, 29.232307191255543,
+                     35.90959778157148, 46.41351659731431, 54.23867620820899, 55.18098633710972, 44.854006835682824, 39.05859527533705,
+                     34.10272614522414, 33.8443342582746, 35.933635773983866, 36.40805794434114]
     np.testing.assert_allclose(losses, golden_losses)
+
 
 if __name__ == '__main__':
     # test_d10_example()
