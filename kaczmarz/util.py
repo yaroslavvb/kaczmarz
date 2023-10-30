@@ -218,6 +218,65 @@ class ToyDataset(NumpyDataset):
         return len(self.data)
 
 
+class TinyMNIST(datasets.MNIST):
+    """Custom-size MNIST autoencoder dataset for debugging. Generates data/target images with reduced resolution and 0
+    channels.
+
+    Use original_targets kwarg to get original MNIST labels instead of autoencoder targets.
+
+
+    """
+
+    def __init__(self, dataset_root='../data', data_width=28, dataset_size=0, train=True, loss_type='CrossEntropy', device=None):
+        """
+
+        Args:
+            data_width: dimension of input images
+            dataset_size: number of examples, use for smaller subsets and running locally
+            loss_type: if LeastSquares, then convert classes to one-hot format
+        """
+
+        if device is None:
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+        super().__init__(dataset_root, download=True, train=train)
+        assert loss_type in [None, 'LeastSquares', 'CrossEntropy']
+
+        if dataset_size > 0:
+            self.data = self.data[:dataset_size, :, :]
+            self.targets = self.targets[:dataset_size]
+
+        if data_width != 28:
+            new_data = np.zeros((self.data.shape[0], data_width, data_width))
+            for i in range(self.data.shape[0]):
+                arr = self.data[i, :].numpy().astype(np.uint8)
+                im = Image.fromarray(arr)
+                im.thumbnail((data_width, data_width), Image.ANTIALIAS)
+                new_data[i, :, :] = np.array(im) / 255
+            self.data = torch.from_numpy(new_data).type(torch.get_default_dtype())
+        else:
+            self.data = self.data.type(torch.get_default_dtype()).unsqueeze(1)
+
+        if loss_type == 'LeastSquares':  # convert to one-hot format
+            new_targets = torch.zeros((self.targets.shape[0], 10))
+            new_targets.scatter_(1, self.targets.unsqueeze(1), 1)
+            self.targets = new_targets
+
+        self.data, self.targets = self.data.to(device), self.targets.to(device)
+
+    def __getitem__(self, index):
+        """
+        Args:
+            index (int): Index
+
+        Returns:
+            tuple: (image, target) where target is index of the target class.
+        """
+        img, target = self.data[index], self.targets[index]
+
+        return img, target
+
+
 def infinite_iter(obj):
     """Wraps iterable object to restart on last iteration."""
 

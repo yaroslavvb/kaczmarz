@@ -30,7 +30,6 @@ import util as u
 
 def test_kron():
     """Test kron, vec and vecr identities"""
-    torch.set_default_dtype(torch.float64)
     a = torch.tensor([1, 2, 3, 4]).reshape(2, 2)
     b = torch.tensor([5, 6, 7, 8]).reshape(2, 2)
     u.check_close(u.kron(a, b).diag().sum(), 65)
@@ -83,6 +82,33 @@ def test_simple_fully_connected():
     image = torch.ones((28, 28))
     assert net(image).shape == (1, 10)
     assert torch.allclose(net(image), torch.tensor([[1., 1., 0., 0., 0., 0., 0., 0., 0., 0.]]))
+
+def test_tiny_mnist():
+    dataset1 = u.TinyMNIST(train=True)
+    dataset2 = u.TinyMNIST(train=False)
+
+    loader1 = torch.utils.data.DataLoader(dataset1, batch_size=1, shuffle=False)
+    loader2 = torch.utils.data.DataLoader(dataset2, batch_size=1, shuffle=False)
+    data1, targets1 = next(iter(loader1))
+    data2, targets2 = next(iter(loader2))
+
+    assert data1.shape == (1, 1, 28, 28)   # B x C x H x W
+    assert torch.allclose(targets1, torch.tensor([5], dtype=torch.int64))
+    assert torch.allclose(targets2, torch.tensor([7], dtype=torch.int64))
+
+    dataset1 = u.TinyMNIST(train=True, loss_type='LeastSquares')
+    dataset2 = u.TinyMNIST(train=False, loss_type='LeastSquares')
+
+    loader1 = torch.utils.data.DataLoader(dataset1, batch_size=1, shuffle=False)
+    loader2 = torch.utils.data.DataLoader(dataset2, batch_size=1, shuffle=False)
+    data1, targets1 = next(iter(loader1))
+    data2, targets2 = next(iter(loader2))
+
+    assert torch.allclose(targets1, torch.tensor([[0., 0, 0, 0, 0, 1, 0, 0, 0, 0]]))
+    assert torch.allclose(targets2, torch.tensor([[0., 0, 0, 0, 0, 0, 0, 1, 0, 0]]))
+
+
+
 
 if __name__ == '__main__':
     # test_kron()
