@@ -195,6 +195,14 @@ def least_squares_loss(data: torch.Tensor, targets=None, aggregation='mean'):
     return torch.sum(err * err) / 2 / normalizer
 
 
+def combined_nll_loss(output, target, reduction='mean'):
+    # output = F.log_softmax(x, dim=1)
+    #             loss = F.nll_loss(output, target)
+    # test_loss += F.nll_loss(output, target, reduction='sum').item()  # sum up batch loss
+    output = F.log_softmax(output, dim=1)
+    return F.nll_loss(output, target, reduction=reduction)
+
+
 class NumpyDataset(data.Dataset):
     def __init__(self, A, Y):
         super().__init__()
