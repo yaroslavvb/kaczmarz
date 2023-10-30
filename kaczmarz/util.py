@@ -183,15 +183,15 @@ def is_matrix(dd) -> bool:
     return len(shape) == 2 and shape[0] >= 1 and shape[1] >= 1
 
 
-def least_squares_loss(data: torch.Tensor, targets=None, aggregation='mean'):
+def least_squares_loss(data: torch.Tensor, targets=None, reduction='mean'):
     """Least squares loss (like MSELoss, but an extra 1/2 factor."""
     assert is_matrix(data), f"Expected matrix, got {data.shape}"
-    assert aggregation in ('mean', 'sum')
+    assert reduction in ('mean', 'sum')
     if targets is None:
         targets = torch.zeros_like(data)
     # err = data - targets.view(-1, data.shape[1])
     err = data - targets
-    normalizer = len(data) if aggregation == 'mean' else 1
+    normalizer = len(data) if reduction == 'mean' else 1
     return torch.sum(err * err) / 2 / normalizer
 
 

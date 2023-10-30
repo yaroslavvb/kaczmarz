@@ -656,8 +656,8 @@ def test_toy_mnist_sqloss():
             super(Net, self).__init__()
             self.conv1 = nn.Conv2d(1, 32, 3, 1)
             self.conv2 = nn.Conv2d(32, 64, 3, 1)
-            self.dropout1 = nn.Dropout(0.25)
-            self.dropout2 = nn.Dropout(0.5)
+            self.dropout1 = nn.Dropout(0)
+            self.dropout2 = nn.Dropout(0)
             self.fc1 = nn.Linear(9216, 128)
             self.fc2 = nn.Linear(128, 10)
 
@@ -673,29 +673,30 @@ def test_toy_mnist_sqloss():
             x = F.relu(x)
             x = self.dropout2(x)
             x = self.fc2(x)
-            # x = F.log_softmax(x, dim=1)
             return x
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     torch.manual_seed(1)
 
     dataset_size = 10
-    train_kwargs = {'batch_size': dataset_size, 'num_workers': 0, 'shuffle': False}
-    test_kwargs = dict(train_kwargs)
-    if device == 'cuda':
-        cuda_kwargs = {'pin_memory': True}
-        train_kwargs.update(cuda_kwargs)
-        test_kwargs.update(cuda_kwargs)
+    num_epochs = 10
+    train_kwargs = {'batch_size': 100, 'num_workers': 0, 'shuffle': False}
+    test_kwargs = {'batch_size': 1000}
 
-    train_dataset = u.TinyMNIST(data_width=28, dataset_size=dataset_size, train=True)
+    do_squared_loss = False
+    do_squared_loss = True
+    loss_fn = u.least_squares_loss if do_squared_loss else u.combined_nll_loss
+    loss_type = 'LeastSquares' if do_squared_loss else 'CrossEntropy'
+
+    train_dataset = u.TinyMNIST(data_width=28, dataset_size=dataset_size, train=True, loss_type=loss_type)
     train_loader = torch.utils.data.DataLoader(train_dataset, **train_kwargs)
 
-    test_dataset = u.TinyMNIST(data_width=28, dataset_size=dataset_size, train=False)
+    test_dataset = u.TinyMNIST(data_width=28, dataset_size=dataset_size, train=False, loss_type=loss_type)
     model = Net().to(device)
-    optimizer = optim.Adadelta(model.parameters(), lr=1.0)
 
-    scheduler = StepLR(optimizer, step_size=1, gamma=0.7)
-    for epoch in range(1, 10):
+    optimizer = optim.SGD(model.parameters(), lr=1e-5, momentum=0)
+
+    for epoch in range(1, num_epochs+1):
         model.eval()
         test_loss, correct = 0, 0
 
@@ -704,10 +705,14 @@ def test_toy_mnist_sqloss():
             for data, target in test_loader:
                 data, target = data.to(device), target.to(device)
                 output = model(data)
-                # test_loss += F.nll_loss(output, target, reduction='sum').item()  # sum up batch loss
-                test_loss += u.combined_nll_loss(output, target, reduction='sum').item()  # sum up batch loss
-                pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
-                correct += pred.eq(target.view_as(pred)).sum().item()
+                test_loss += loss_fn(output, target, reduction='sum').item()  # sum up batch loss
+                if do_squared_loss:
+                    actual = target.argmax(dim=1, keepdim=True)
+                    pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
+                    correct += pred.eq(actual).sum().item()
+                else:
+                    pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
+                    correct += pred.eq(target.view_as(pred)).sum().item()
 
         test_loss /= len(test_loader.dataset)
 
@@ -717,16 +722,14 @@ def test_toy_mnist_sqloss():
             optimizer.zero_grad()
             output = model(data)
             # loss = F.nll_loss(output, target)
-            loss = u.combined_nll_loss(output, target)
+            loss = loss_fn(output, target)
             loss.backward()
             optimizer.step()
 
             output = model(data)
             # new_loss = F.nll_loss(output, target)
-            new_loss = u.combined_nll_loss(output, target)
-            print(f"old loss: {loss.item()}, new loss: {new_loss.item()}")
-
-        scheduler.step()
+            new_loss = loss_fn(output, target)
+        print(f"correct: {correct}, test_loss: {test_loss:.2f}, old train loss: {loss.item():.2f}, new train loss: {new_loss.item():.2f}")
 
 
 if __name__ == '__main__':
