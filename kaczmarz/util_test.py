@@ -84,8 +84,11 @@ def test_simple_fully_connected():
     assert torch.allclose(net(image), torch.tensor([[1., 1., 0., 0., 0., 0., 0., 0., 0., 0.]]))
 
 def test_tiny_mnist():
-    dataset1 = u.TinyMNIST(train=True)
+    dataset1 = u.TinyMNIST(train=True, )
     dataset2 = u.TinyMNIST(train=False)
+
+    dataset1 = u.TinyMNIST(data_width=28, dataset_size=100, train=True, loss_type='CrossEntropy')
+    dataset2 = u.TinyMNIST(data_width=28, dataset_size=100, train=False, loss_type='CrossEntropy')
 
     loader1 = torch.utils.data.DataLoader(dataset1, batch_size=1, shuffle=False)
     loader2 = torch.utils.data.DataLoader(dataset2, batch_size=1, shuffle=False)

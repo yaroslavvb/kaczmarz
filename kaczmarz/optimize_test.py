@@ -600,14 +600,13 @@ def test_toy_mnist():
             return output
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    torch.manual_seed(1)
 
-    dataset_size = 100
-    train_kwargs = {'batch_size': dataset_size}
-    test_kwargs = {'batch_size': dataset_size}
+    dataset_size = 10
+    train_kwargs = {'batch_size': dataset_size, 'num_workers': 0, 'shuffle': False}
+    test_kwargs = dict(train_kwargs)
     if device == 'cuda':
-        cuda_kwargs = {'num_workers': 1,
-                       'pin_memory': True,
-                       'shuffle': False}
+        cuda_kwargs = {'pin_memory': True}
         train_kwargs.update(cuda_kwargs)
         test_kwargs.update(cuda_kwargs)
 
@@ -626,19 +625,13 @@ def test_toy_mnist():
         test_loader = torch.utils.data.DataLoader(test_dataset, **test_kwargs)
         with torch.no_grad():
             for data, target in test_loader:
-                # print("observed: ", target)
                 data, target = data.to(device), target.to(device)
                 output = model(data)
                 test_loss += F.nll_loss(output, target, reduction='sum').item()  # sum up batch loss
                 pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
-                # print("predicted: ", pred.view_as(target))
                 correct += pred.eq(target.view_as(pred)).sum().item()
 
         test_loss /= len(test_loader.dataset)
-
-        print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-            test_loss, correct, len(test_loader.dataset),
-            100. * correct / len(test_loader.dataset)))
 
         model.train()
         for batch_idx, (data, target) in enumerate(train_loader):
@@ -654,6 +647,8 @@ def test_toy_mnist():
                            100. * batch_idx / len(train_loader), loss.item()))
 
         scheduler.step()
+
+    assert correct == 5
 
 
 if __name__ == '__main__':
