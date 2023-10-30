@@ -96,6 +96,13 @@ def test_tiny_mnist():
     assert torch.allclose(targets1, torch.tensor([5], dtype=torch.int64))
     assert torch.allclose(targets2, torch.tensor([7], dtype=torch.int64))
 
+    loader1 = torch.utils.data.DataLoader(dataset1, batch_size=2, shuffle=False)
+    loader2 = torch.utils.data.DataLoader(dataset2, batch_size=3, shuffle=False)
+    data1, _unused_targets1 = next(iter(loader1))
+    data2, _unused_targets2 = next(iter(loader2))
+    assert data1.shape == (2, 1, 28, 28)   # B x C x H x W
+    assert data2.shape == (3, 1, 28, 28)   # B x C x H x W
+
     dataset1 = u.TinyMNIST(train=True, loss_type='LeastSquares')
     dataset2 = u.TinyMNIST(train=False, loss_type='LeastSquares')
 
