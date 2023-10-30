@@ -8,6 +8,13 @@ from torchvision import datasets, transforms
 
 import util as u
 
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from torchvision import datasets, transforms
+from torch.optim.lr_scheduler import StepLR
+
+
 
 def numpy_kron(a, b):
     result = u.kron(u.from_numpy(a), u.from_numpy(b))
@@ -563,6 +570,90 @@ def test_linear_mnist(bias=True):
                      35.90959778157148, 46.41351659731431, 54.23867620820899, 55.18098633710972, 44.854006835682824, 39.05859527533705,
                      34.10272614522414, 33.8443342582746, 35.933635773983866, 36.40805794434114]
     np.testing.assert_allclose(losses, golden_losses)
+
+
+# End-to-end testing of toy mnist dataset
+def test_toy_mnist():
+    class Net(nn.Module):
+        def __init__(self):
+            super(Net, self).__init__()
+            self.conv1 = nn.Conv2d(1, 32, 3, 1)
+            self.conv2 = nn.Conv2d(32, 64, 3, 1)
+            self.dropout1 = nn.Dropout(0.25)
+            self.dropout2 = nn.Dropout(0.5)
+            self.fc1 = nn.Linear(9216, 128)
+            self.fc2 = nn.Linear(128, 10)
+
+        def forward(self, x):
+            x = self.conv1(x)
+            x = F.relu(x)
+            x = self.conv2(x)
+            x = F.relu(x)
+            x = F.max_pool2d(x, 2)
+            x = self.dropout1(x)
+            x = torch.flatten(x, 1)
+            x = self.fc1(x)
+            x = F.relu(x)
+            x = self.dropout2(x)
+            x = self.fc2(x)
+            output = F.log_softmax(x, dim=1)
+            return output
+
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    dataset_size = 100
+    train_kwargs = {'batch_size': dataset_size}
+    test_kwargs = {'batch_size': dataset_size}
+    if device == 'cuda':
+        cuda_kwargs = {'num_workers': 1,
+                       'pin_memory': True,
+                       'shuffle': False}
+        train_kwargs.update(cuda_kwargs)
+        test_kwargs.update(cuda_kwargs)
+
+    train_dataset = u.TinyMNIST(data_width=28, dataset_size=dataset_size, train=True)
+    train_loader = torch.utils.data.DataLoader(train_dataset, **train_kwargs)
+
+    test_dataset = u.TinyMNIST(data_width=28, dataset_size=dataset_size, train=False)
+    model = Net().to(device)
+    optimizer = optim.Adadelta(model.parameters(), lr=1.0)
+
+    scheduler = StepLR(optimizer, step_size=1, gamma=0.7)
+    for epoch in range(1, 10):
+        model.eval()
+        test_loss, correct = 0, 0
+
+        test_loader = torch.utils.data.DataLoader(test_dataset, **test_kwargs)
+        with torch.no_grad():
+            for data, target in test_loader:
+                # print("observed: ", target)
+                data, target = data.to(device), target.to(device)
+                output = model(data)
+                test_loss += F.nll_loss(output, target, reduction='sum').item()  # sum up batch loss
+                pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
+                # print("predicted: ", pred.view_as(target))
+                correct += pred.eq(target.view_as(pred)).sum().item()
+
+        test_loss /= len(test_loader.dataset)
+
+        print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+            test_loss, correct, len(test_loader.dataset),
+            100. * correct / len(test_loader.dataset)))
+
+        model.train()
+        for batch_idx, (data, target) in enumerate(train_loader):
+            data, target = data.to(device), target.to(device)
+            optimizer.zero_grad()
+            output = model(data)
+            loss = F.nll_loss(output, target)
+            loss.backward()
+            optimizer.step()
+            if batch_idx % 1000 == 0:
+                print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                    epoch, batch_idx * len(data), len(train_loader.dataset),
+                           100. * batch_idx / len(train_loader), loss.item()))
+
+        scheduler.step()
 
 
 if __name__ == '__main__':
