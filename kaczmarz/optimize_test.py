@@ -6,7 +6,7 @@ import torch.nn as nn
 from torch.utils import tensorboard
 from torchvision import datasets, transforms
 
-import util as u
+import kac as u
 
 import torch.nn as nn
 import torch.nn.functional as F
