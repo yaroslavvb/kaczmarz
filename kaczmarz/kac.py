@@ -1,45 +1,82 @@
+import gc
 import inspect
-import math
-import os
-import random
 import sys
 import time
-from typing import Any, Dict, Callable, Optional, Tuple, Union
-from typing import List
+from contextlib import contextmanager
 
 import numpy as np
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.datasets as datasets
 # import wandb
 from PIL import Image
-from torch.utils import tensorboard
 
-from contextlib import contextmanager
-from typing import Callable, Tuple
-
-import torch
-import torch.nn as nn
-
-import numpy as np
-
-import globals as gl
+# import globals as gl
 
 # to enable referring to functions in its own module as u.func
 u = sys.modules[__name__]
 
 
-def log_scalars(metrics: Dict[str, Any]) -> None:
-    assert gl.event_writer is not None, "initialize event_writer as gl.event_writer = SummaryWriter(logdir)"
-    for tag in metrics:
-        gl.event_writer.add_scalar(tag=tag, scalar_value=metrics[tag], global_step=gl.get_global_step())
-        # gl.event_writer.add_s
-    if 'epoch' in metrics:
-        print('logging at ', gl.get_global_step(), metrics.get('epoch', -1))
+#def log_scalars(metrics: Dict[str, Any]) -> None:
+#    assert gl.event_writer is not None, "initialize event_writer as gl.event_writer = SummaryWriter(logdir)"
+#    for tag in metrics:
+#        gl.event_writer.add_scalar(tag=tag, scalar_value=metrics[tag], global_step=gl.get_global_step())
+#        # gl.event_writer.add_s
+#    if 'epoch' in metrics:
+#        print('logging at ', gl.get_global_step(), metrics.get('epoch', -1))
 
 
 global_timeit_dict = {}
+
+# Loads file from Github
+# import urllib
+# from io import BytesIO
+
+#def githubLoad(fn):
+#    srcRoot = 'https://github.com/yaroslavvb/kaczmarz/raw/main/kaczmarz'
+#    url = srcRoot + '/' + fn
+#
+#    with urllib.request.urlopen(url) as response:
+#        buffer = BytesIO(response.read())
+#        arr = np.load(buffer, allow_pickle=True)
+#    return arr
+
+
+class timeit:
+    """Decorator to measure length of time spent in the block in millis and log
+    it to TensorBoard. This function is
+    """
+
+    def __init__(self, tag=""):
+        self.tag = tag
+
+    def __enter__(self):
+        self.start = time.perf_counter()
+        return self
+
+    def __exit__(self, *args):
+        global last_time
+        self.end = time.perf_counter()
+        interval_ms = 1000 * (self.end - self.start)
+        torch.cuda.synchronize()
+        print(f"{interval_ms:8.2f}   {self.tag}")
+        last_time = interval_ms
+
+
+@contextmanager
+def measure_memory(label):
+    torch.cuda.synchronize()
+    torch._C._cuda_clearCublasWorkspaces()
+    torch.cuda.reset_peak_memory_stats()
+    memory_before = torch.cuda.memory_allocated()
+    yield
+    torch.cuda.synchronize()
+    gc.collect()
+    torch._C._cuda_clearCublasWorkspaces()
+    memory_after = torch.cuda.memory_allocated()
+    memory_delta = memory_after - memory_before
+    memory_peak = torch.cuda.max_memory_allocated()
+    print(f"{label:20s}: {memory_before / 1e6:8.0f} {memory_after / 1e6:8.0f} {memory_delta / 1e6:8.0f} {memory_peak / 1e6:8.0f}")
 
 
 class timeit:
@@ -54,11 +91,20 @@ class timeit:
         return self
 
     def __exit__(self, *args):
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
         self.end = time.perf_counter()
         interval_ms = 1000 * (self.end - self.start)
         global_timeit_dict.setdefault(self.tag, []).append(interval_ms)
-        # print(f"{interval_ms:8.2f}   {self.tag}")
-        log_scalars({'time/' + self.tag: interval_ms})
+        print(f"{interval_ms:8.2f}   {self.tag}")
+        # log_scalars({'time/' + self.tag: interval_ms})
+
+        #global last_time
+        #self.end = time.perf_counter()
+        #interval_ms = 1000 * (self.end - self.start)
+        #torch.cuda.synchronize()
+        #print(f"{interval_ms:8.2f}   {self.tag}")
+        #last_time = interval_ms
 
 
 _pytorch_floating_point_types = (torch.float16, torch.float32, torch.float64)
@@ -293,7 +339,7 @@ def infinite_iter(obj):
             yield result
 
 
-from typing import Any, Dict, Callable, Optional, Tuple, Union, Sequence, Iterable
+from typing import Callable, Optional, Tuple, Union
 from typing import List
 
 import torch
@@ -349,30 +395,30 @@ class SimpleFullyConnected(nn.Module):
         return x
 
 
-def run_all_tests(module: nn.Module):
-    class local_timeit:
-        """Decorator to measure length of time spent in the block in millis and log
-        it to TensorBoard."""
-
-        def __init__(self, tag=""):
-            self.tag = tag
-
-        def __enter__(self):
-            self.start = time.perf_counter()
-            return self
-
-        def __exit__(self, *args):
-            self.end = time.perf_counter()
-            interval_ms = 1000 * (self.end - self.start)
-            global_timeit_dict.setdefault(self.tag, []).append(interval_ms)
-            print(f"{interval_ms:8.2f}   {self.tag}")
-
-    all_functions = inspect.getmembers(module, inspect.isfunction)
-    for name, func in all_functions:
-        if name.startswith("test_"):
-            with local_timeit(name):
-                func()
-    print(module.__name__ + " tests passed.")
+# def run_all_tests(module: nn.Module):
+#     class local_timeit:
+#         """Decorator to measure length of time spent in the block in millis and log
+#         it to TensorBoard."""
+#
+#         def __init__(self, tag=""):
+#             self.tag = tag
+#
+#         def __enter__(self):
+#             self.start = time.perf_counter()
+#             return self
+#
+#         def __exit__(self, *args):
+#             self.end = time.perf_counter()
+#             interval_ms = 1000 * (self.end - self.start)
+#             global_timeit_dict.setdefault(self.tag, []).append(interval_ms)
+#             print(f"{interval_ms:8.2f}   {self.tag}")
+#
+#     all_functions = inspect.getmembers(module, inspect.isfunction)
+#     for name, func in all_functions:
+#         if name.startswith("test_"):
+#             with local_timeit(name):
+#                 func()
+#     print(module.__name__ + " tests passed.")
 
 
 def is_vector(dd) -> bool:
