@@ -9,7 +9,7 @@ from scipy import linalg
 import torch
 
 import numpy as np
-import util as u
+import kac as u
 
 
 import numpy as np
@@ -26,7 +26,7 @@ import torch.nn.functional as F
 import inspect
 import time
 
-import util as u
+import kac as u
 
 def test_kron():
     """Test kron, vec and vecr identities"""
