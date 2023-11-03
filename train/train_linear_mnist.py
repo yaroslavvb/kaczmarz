@@ -26,27 +26,28 @@ def main():
     torch.manual_seed(1)
 
     dataset_size = 1000
-    train_kwargs = {'batch_size': 100, 'num_workers': 0, 'shuffle': False}
-    test_kwargs = {'batch_size': 1000}
+    train_kwargs = {'batch_size': 10, 'num_workers': 0, 'shuffle': False}
+    test_kwargs = {'batch_size': 10}
 
     # do_squared_loss = False
     do_squared_loss = True
     loss_type = 'LeastSquares' if do_squared_loss else 'CrossEntropy'
     loss_fn = kac.least_squares_loss if do_squared_loss else kac.combined_nll_loss
 
-    train_dataset = kac.TinyMNIST(data_width=28, dataset_size=dataset_size, train=True, loss_type=loss_type)
-    train_dataset = kac.NumpyDataset(root+'/data/mnistTrain.npy', root+'/data/mnistTrain-labels.npy')
+    train_dataset = kac.NumpyDataset(root+'/data/mnistTrainW.npy',
+                                     root+'/data/mnistTrain-labels.npy',
+                                     dataset_size=dataset_size)
     train_loader = torch.utils.data.DataLoader(train_dataset, **train_kwargs)
 
-    test_dataset = kac.TinyMNIST(data_width=28, dataset_size=dataset_size, train=False, loss_type=loss_type)
-    # test_dataset = kac.NumpyDataset(np.load(root+'/data/mnistTest.npy'))
-    train_dataset = kac.NumpyDataset(root+'/data/mnistTest.npy', root+'/data/mnistTest-labels.npy')
-
+    test_dataset = kac.NumpyDataset(root+'/data/mnistTestW.npy',
+                                    root+'/data/mnistTest-labels.npy',
+                                    dataset_size=dataset_size)
 
     model = Net(d0=28*28).to(device)
-    optimizer = optim.SGD(model.parameters(), lr=1e-7, momentum=0.)
+    optimizer = optim.SGD(model.parameters(), lr=0.5, momentum=0.)
 
-    for epoch in range(1, 100):
+    print("dataset size: ", len(train_dataset))
+    for epoch in range(1, 10):
         model.eval()
         test_loss, correct = 0, 0
 

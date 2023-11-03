@@ -734,6 +734,11 @@ def test_toy_mnist_sqloss():
             new_loss = loss_fn(output, target)
         print(f"correct: {correct}, test_loss: {test_loss:.2f}, old train loss: {loss.item():.2f}, new train loss: {new_loss.item():.2f}")
 
+def test_whitened_mnist():
+    A = np.load(root+'/data/mnistTrainW.npy')
+    norms2 = (A*A).sum(axis=1)
+    # mean 1, median 0.62    print(f"Average norm squared: {norms2.mean()}, median: {np.quantile(norms2,.5)}")
+    np.testing.assert_allclose(norms2.mean(), 1)
 
 if __name__ == '__main__':
     # test_d10_example()
