@@ -250,15 +250,20 @@ def combined_nll_loss(output, target, reduction='mean'):
 
 
 class NumpyDataset(data.Dataset):
-    def __init__(self, A, Y):
+    def __init__(self, A, Y, dataset_size=0):
         super().__init__()
 
         def maybe_load_from_numpy(arr):
             if isinstance(arr, str):
                 return np.load(arr)
+            return arr
 
         self.data = torch.tensor(maybe_load_from_numpy(A)).type(torch.get_default_dtype())
         self.targets = torch.tensor(maybe_load_from_numpy(Y)).type(torch.get_default_dtype())
+
+        if dataset_size > 0:
+            self.data = self.data[:dataset_size]
+            self.targets = self.targets[:dataset_size]
 
     def __getitem__(self, index):
         return self.data[index], self.targets[index]

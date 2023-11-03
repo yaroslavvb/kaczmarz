@@ -12,7 +12,7 @@ root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 def one_hot_decode(Y):
     newY = torch.zeros((Y.shape[0], 10))
-    newY.scatter(1, Y.unsqueeze(1), 1)
+    newY.scatter_(1, Y.unsqueeze(1), 1)
     return newY
 
 def main():
