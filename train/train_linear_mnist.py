@@ -1,3 +1,6 @@
+import os
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -16,6 +19,8 @@ class Net(nn.Module):
         return x
 
 
+root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+
 def main():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     torch.manual_seed(1)
@@ -30,8 +35,13 @@ def main():
     loss_fn = kac.least_squares_loss if do_squared_loss else kac.combined_nll_loss
 
     train_dataset = kac.TinyMNIST(data_width=28, dataset_size=dataset_size, train=True, loss_type=loss_type)
+    train_dataset = kac.NumpyDataset(root+'/data/mnistTrain.npy', root+'/data/mnistTrain-labels.npy')
     train_loader = torch.utils.data.DataLoader(train_dataset, **train_kwargs)
+
     test_dataset = kac.TinyMNIST(data_width=28, dataset_size=dataset_size, train=False, loss_type=loss_type)
+    # test_dataset = kac.NumpyDataset(np.load(root+'/data/mnistTest.npy'))
+    train_dataset = kac.NumpyDataset(root+'/data/mnistTest.npy', root+'/data/mnistTest-labels.npy')
+
 
     model = Net(d0=28*28).to(device)
     optimizer = optim.SGD(model.parameters(), lr=1e-7, momentum=0.)

@@ -253,8 +253,12 @@ class NumpyDataset(data.Dataset):
     def __init__(self, A, Y):
         super().__init__()
 
-        self.data = torch.tensor(A).type(torch.get_default_dtype())
-        self.targets = torch.tensor(Y).type(torch.get_default_dtype())
+        def maybe_load_from_numpy(arr):
+            if isinstance(arr, str):
+                return np.load(arr)
+
+        self.data = torch.tensor(maybe_load_from_numpy(A)).type(torch.get_default_dtype())
+        self.targets = torch.tensor(maybe_load_from_numpy(Y)).type(torch.get_default_dtype())
 
     def __getitem__(self, index):
         return self.data[index], self.targets[index]
