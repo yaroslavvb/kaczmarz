@@ -737,8 +737,11 @@ def test_toy_mnist_sqloss():
 def test_whitened_mnist():
     A = np.load(root+'/data/mnistTrainW.npy')
     norms2 = (A*A).sum(axis=1)
+    means = A.sum(axis=1)
+
     # mean 1, median 0.62    print(f"Average norm squared: {norms2.mean()}, median: {np.quantile(norms2,.5)}")
     np.testing.assert_allclose(norms2.mean(), 1)
+    np.testing.assert_allclose((means*means).sum(), 0, atol=1e-6)
 
 if __name__ == '__main__':
     # test_d10_example()

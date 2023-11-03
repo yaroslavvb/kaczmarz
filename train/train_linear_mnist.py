@@ -7,6 +7,7 @@ import torch.optim as optim
 
 import kaczmarz.kac as kac
 
+
 class Net(nn.Module):
     def __init__(self, d0):
         super(Net, self).__init__()
@@ -21,6 +22,7 @@ class Net(nn.Module):
 
 root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
+
 def main():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     torch.manual_seed(1)
@@ -34,22 +36,22 @@ def main():
     loss_type = 'LeastSquares' if do_squared_loss else 'CrossEntropy'
     loss_fn = kac.least_squares_loss if do_squared_loss else kac.combined_nll_loss
 
-    train_dataset = kac.NumpyDataset(root+'/data/mnistTrainW.npy',
-                                     root+'/data/mnistTrain-labels.npy',
+    train_dataset = kac.NumpyDataset(root + '/data/mnistTrainW.npy',
+                                     root + '/data/mnistTrain-labels.npy',
                                      dataset_size=dataset_size)
     train_loader = torch.utils.data.DataLoader(train_dataset, **train_kwargs)
 
-    test_dataset = kac.NumpyDataset(root+'/data/mnistTestW.npy',
-                                    root+'/data/mnistTest-labels.npy',
+    test_dataset = kac.NumpyDataset(root + '/data/mnistTestW.npy',
+                                    root + '/data/mnistTest-labels.npy',
                                     dataset_size=dataset_size)
 
-    model = Net(d0=28*28).to(device)
-    optimizer = optim.SGD(model.parameters(), lr=0.5, momentum=0.)
+    model = Net(d0=28 * 28).to(device)
+    optimizer = optim.SGD(model.parameters(), lr=1 / 10, momentum=0.)
 
     print("dataset size: ", len(train_dataset))
     for epoch in range(1, 10):
         model.eval()
-        test_loss, correct = 0, 0
+        test_loss, correct, total = 0, 0, 0
 
         test_loader = torch.utils.data.DataLoader(test_dataset, **test_kwargs)
         with torch.no_grad():
@@ -64,6 +66,7 @@ def main():
                 else:
                     pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
                     correct += pred.eq(target.view_as(pred)).sum().item()
+                total += data.shape[0]
         test_loss /= len(test_loader.dataset)
 
         model.train()
@@ -81,7 +84,8 @@ def main():
             output = model(data)
             # new_loss = F.nll_loss(output, target)
             new_loss = loss_fn(output, target)
-        print(f"correct: {correct}, test_loss: {test_loss:.2f}, old train loss: {loss.item():.2f}, new train loss: {new_loss.item():.2f}")
+        print(
+            f"accuracy: {correct / total:0.2f}, test_loss: {test_loss:.2f}, old train loss: {loss.item():.2f}, new train loss: {new_loss.item():.2f}")
 
 
 if __name__ == '__main__':
