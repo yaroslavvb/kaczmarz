@@ -14,10 +14,11 @@ from PIL import Image
 # import globals as gl
 
 # to enable referring to functions in its own module as u.func
+import kaczmarz.kac
+
 u = sys.modules[__name__]
 
-
-#def log_scalars(metrics: Dict[str, Any]) -> None:
+# def log_scalars(metrics: Dict[str, Any]) -> None:
 #    assert gl.event_writer is not None, "initialize event_writer as gl.event_writer = SummaryWriter(logdir)"
 #    for tag in metrics:
 #        gl.event_writer.add_scalar(tag=tag, scalar_value=metrics[tag], global_step=gl.get_global_step())
@@ -28,11 +29,12 @@ u = sys.modules[__name__]
 
 global_timeit_dict = {}
 
+
 # Loads file from Github
 # import urllib
 # from io import BytesIO
 
-#def githubLoad(fn):
+# def githubLoad(fn):
 #    srcRoot = 'https://github.com/yaroslavvb/kaczmarz/raw/main/kaczmarz'
 #    url = srcRoot + '/' + fn
 #
@@ -99,12 +101,12 @@ class timeit:
         print(f"{interval_ms:8.2f}   {self.tag}")
         # log_scalars({'time/' + self.tag: interval_ms})
 
-        #global last_time
-        #self.end = time.perf_counter()
-        #interval_ms = 1000 * (self.end - self.start)
-        #torch.cuda.synchronize()
-        #print(f"{interval_ms:8.2f}   {self.tag}")
-        #last_time = interval_ms
+        # global last_time
+        # self.end = time.perf_counter()
+        # interval_ms = 1000 * (self.end - self.start)
+        # torch.cuda.synchronize()
+        # print(f"{interval_ms:8.2f}   {self.tag}")
+        # last_time = interval_ms
 
 
 _pytorch_floating_point_types = (torch.float16, torch.float32, torch.float64)
@@ -221,8 +223,10 @@ def check_equal(observed, truth, rtol=1e-9, atol=1e-12, label: str = '') -> None
         print(f'Numerical testing failed for {label}')
         np.testing.assert_allclose(truth, observed, rtol=rtol, atol=atol, equal_nan=True)
 
+
 import torch
 import torch.utils.data as data
+
 
 def is_matrix(dd) -> bool:
     shape = dd.shape
@@ -271,6 +275,7 @@ class NumpyDataset(data.Dataset):
     def __len__(self):
         return len(self.data)
 
+
 class ToyDataset(NumpyDataset):
     def __init__(self):
         A = [[1, 0], [1, 1]]
@@ -290,13 +295,15 @@ class TinyMNIST(datasets.MNIST):
 
     """
 
-    def __init__(self, dataset_root='../data', data_width=28, dataset_size=0, train=True, loss_type='CrossEntropy', device=None):
+    def __init__(self, dataset_root='../data', data_width=28, dataset_size=0, train=True, loss_type='CrossEntropy', device=None,
+                 whiteningMatrix=None, whiten=False):
         """
 
         Args:
             data_width: dimension of input images
             dataset_size: number of examples, use for smaller subsets and running locally
             loss_type: if LeastSquares, then convert classes to one-hot format
+            normalize: if True, centers and whitens dataset
         """
 
         if device is None:
@@ -305,11 +312,31 @@ class TinyMNIST(datasets.MNIST):
         super().__init__(dataset_root, download=True, train=train)
         assert loss_type in [None, 'LeastSquares', 'CrossEntropy']
 
+        # compute whitening matrix. Can only be done on training data MNIST
+        if whiten:
+            assert train or whiteningMatrix is not None
+
+            if whiteningMatrix is None:
+                data = self.data
+                data = data.reshape(data.shape[0], -1)
+                A = data - torch.mean(data.float(), dim=1, keepdim=True)
+                cov = A.T @ A
+                w = isymsqrt(cov)
+
+                B = A @ whiten
+                totalNorm = (B * B).sum()
+                correction = torch.sqrt(totalNorm / data.shape[0])
+                whiteningMatrix = w / correction
+                self.whiteningMatix = whiteningMatrix
+            else:
+                self.whiteningMatix = whiteningMatrix
+
         if dataset_size > 0:
             self.data = self.data[:dataset_size, :, :]
             self.targets = self.targets[:dataset_size]
 
         if data_width != 28:
+            assert not whiten, "Whitening only supported for default size images"
             new_data = np.zeros((self.data.shape[0], data_width, data_width))
             for i in range(self.data.shape[0]):
                 arr = self.data[i, :].numpy().astype(np.uint8)
@@ -318,6 +345,13 @@ class TinyMNIST(datasets.MNIST):
                 new_data[i, :, :] = np.array(im) / 255
             self.data = torch.from_numpy(new_data).type(torch.get_default_dtype())
         else:
+            if whiten:
+                data = self.data
+                data = data - torch.mean(data, dim=1)
+                data = data.reshape(data.shape[0], -1)
+                data = data @ self.whiteningMatrix
+                data = data.reshape(-1, 28, 28)
+                self.data = data
             self.data = self.data.type(torch.get_default_dtype()).unsqueeze(1)
 
         if loss_type == 'LeastSquares':  # convert to one-hot format
@@ -381,8 +415,8 @@ class SimpleFullyConnected(nn.Module):
             self.all_layers.append(linear)
 
             # Initialize with ones
-            bigger = max(d[i+1], d[i])
-            smaller = min(d[i+1], d[i])
+            bigger = max(d[i + 1], d[i])
+            smaller = min(d[i + 1], d[i])
             # linear.weight.data = torch.zeros((d[i + 1], d[i]))
             eye = torch.eye(bigger)
             linear.weight.data = init_scale * eye[:d[i + 1], :d[i]]
@@ -458,22 +492,76 @@ def kron(a: Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]], b: Optional[
         return result.reshape(a.size(0) * b.size(0), a.size(1) * b.size(1))
 
 
+def nan_check(mat):
+    nan_mask = torch.isnan(mat).float()
+    nans = torch.sum(nan_mask).item()
+    not_nans = torch.sum(torch.tensor(1) - nan_mask).item()
+
+    assert nans == 0, f"matrix of shape {mat.shape} has {nans}/{nans + not_nans} nans"
+
+
+def has_nan(mat):
+    return torch.sum(torch.isnan(mat)) > 0
+
+
+def isymsqrt(mat, *args):
+    return symsqrt(mat, inverse=True, *args)
+
+
+def symsqrt(mat, cond=None, return_rank=False, inverse=False):
+    """Computes the symmetric square root of a symmetric matrix. Throws away small and negative eigenvalues."""
+
+    nan_check(mat)
+    s, u = torch.symeig(mat, eigenvectors=True)
+
+    # todo(y): dedupe with getcond
+    cond_dict = {torch.float32: 1e3 * 1.1920929e-07, torch.float64: 1E6 * 2.220446049250313e-16}
+
+    if cond in [None, -1]:
+        cond = cond_dict[mat.dtype]
+
+    # Note, this can include negative values, see https://github.com/pytorch/pytorch/issues/25972
+    above_cutoff = (s > cond * torch.max(abs(s)))
+
+    if torch.sum(above_cutoff) == 0:
+        return torch.zeros_like(mat)
+
+    sigma_diag = torch.sqrt(s[above_cutoff])
+    if inverse:
+        sigma_diag = 1 / sigma_diag
+    u = u[:, above_cutoff]
+
+    B = u @ torch.diag(sigma_diag) @ u.t()
+
+    if torch.sum(torch.isnan(B)) > 0:
+        assert False, "Got nans"
+
+    if return_rank:
+        return B, len(sigma_diag)
+    else:
+        return B
+
+
 @contextmanager
 def module_hook(hook: Callable):
     handle = nn.modules.module.register_module_forward_hook(hook, always_call=True)
     yield
     handle.remove()
 
+
 def _layer_type(layer: nn.Module) -> str:
     return layer.__class__.__name__
 
+
 def is_leaf_module(module: nn.Module) -> bool:
     return len(list(module.children())) == 0
+
 
 def zero_custom_grad(model):
     for p in model.parameters():
         if p.grad is not None:
             p.grad = None
+
 
 def copy_custom_grad_to_grad(model: nn.Module) -> None:
     """for all layers in the model, replaces .grad with .custom_grad"""

@@ -45,8 +45,11 @@ def main():
                                     root + '/data/mnistTest-labels.npy',
                                     dataset_size=dataset_size)
 
+    # train_dataset = kac.TinyMNIST(train=True, whiten=True)
+    # test_dataset = kac.TinyMNIST(train=False, whiten=True, whiteningMatrix=train_dataset.whiteningMatix)
+
     model = Net(d0=28 * 28).to(device)
-    optimizer = optim.SGD(model.parameters(), lr=1 / 10, momentum=0.)
+    optimizer = optim.SGD(model.parameters(), lr=1/10, momentum=0.)
 
     print("dataset size: ", len(train_dataset))
     for epoch in range(1, 10):
