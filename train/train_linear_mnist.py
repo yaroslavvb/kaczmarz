@@ -46,8 +46,7 @@ def main():
 
     model = Net(d0=28 * 28).to(device)
 
-    # converget
-    optimizer = optim.SGD(model.parameters(), lr=0.5, momentum=0.)
+    optimizer = optim.SGD(model.parameters(), lr=1, momentum=0.)
 
     for epoch in range(1, 10):
         model.eval()

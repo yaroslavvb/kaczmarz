@@ -345,7 +345,10 @@ class CustomMNIST(datasets.MNIST):
 
                 # 712 non-zero eigs, 60000 examples, normalize to have examples with unit norm on average
                 # W = W * np.sqrt(60000 / 712)
-                W = W / np.sqrt(712)
+                # W = W / np.sqrt(712)
+
+                # normalize examples to have E[x^2]/E[x^4]=1, see "Adjustment for fourth-moment normalization" in linear-estimation.nb
+                W = W * 0.0184887
                 CustomMNIST.mnistTrainWhiteningMatrix = torch.tensor(W, device=device)
 
         if dataset_size > 0:

@@ -722,15 +722,15 @@ def test_whitened_mnist():
     X, Y = next(iter(loader))
     X = X.double().reshape(-1, 28 * 28)
 
+    print("Ratio: ", kac.getMoment2(X)/kac.getMoment4(X))
+
     assert(kac.getIntrinsicDim(kac.getCov(X)) > 711)   # actual rank is slightly smaller than 712, maybe due to float32 downcast
-    assert 60000 <= np.trace(X.T @ X) <= 60040
 
     # average norm squared is 1
-    np.testing.assert_allclose(np.trace(kac.getCov(X)), 1, atol=1e-3, rtol=1e-3)
+    #    np.testing.assert_allclose(np.trace(kac.getCov(X)), 1, atol=1e-3, rtol=1e-3)
 
-    # average fourth moment is 4
-    # 4.10871 in Mathematica, 4.0686 here
-    assert int(kac.getMoment4(X)) == 4
+    # check that dataset is learning rate normalized
+    assert int(kac.getMoment2(X)/kac.getMoment4(X)) == 1
 
     dataset = kac.CustomMNIST(train=False, whiten_and_center=True)
     loader = torch.utils.data.DataLoader(dataset, batch_size=10000, shuffle=False)
