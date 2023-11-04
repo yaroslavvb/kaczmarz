@@ -113,9 +113,6 @@ def test_toy_multiclass_with_bias():
     golden_losses_kac = [39 / 4, 13 / 4, 13 / 9, 13 / 9, 52 / 81, 52 / 81]
     golden_losses_sgd = [39 / 4, 7 / 4, 33 / 4, 77 / 4, 297 / 4, 109 / 4]
 
-    print("Losses Kaczmarz: ", losses_kac[:5])
-    print("Losses SGD: ", losses_sgd[:5])
-
     np.testing.assert_allclose(losses_kac, golden_losses_kac, rtol=1e-10, atol=1e-20)
     np.testing.assert_allclose(losses_sgd, golden_losses_sgd, rtol=1e-10, atol=1e-20)
 
@@ -147,7 +144,6 @@ def test_d10_example():
         losses.extend([getLoss()])
 
     u.check_close(golden_losses, losses)
-    print(losses)
 
 
 def test_d1000_example():
@@ -372,7 +368,7 @@ def test_manual_optimizer():
             if has_bias:
                 # B is (m, c) residual matrix
                 update = torch.einsum('mc,m->c', B, ones)
-                layer.bias.manual_grad = update.T / m  # B.T.sum(axis=1)
+                layer.bias.manual_grad = update.unsqueeze(0).T / m  # B.T.sum(axis=1)
 
             handles[idx].remove()
 
@@ -388,11 +384,9 @@ def test_manual_optimizer():
         if bias:
             layer.bias.data.zero_()
         model = torch.nn.Sequential(layer).to(device)
-        print(f'step {-1}: test loss = {getLoss(model)}')
 
         optimizer = torch.optim.SGD(model.parameters(), lr=1, momentum=0)
         num_steps = 5
-        print(f'step {-1}: test loss = {getLoss(model)}')
 
         losses = [getLoss(model)]
         for step in range(num_steps):
@@ -410,7 +404,6 @@ def test_manual_optimizer():
             # TODO(y): update bias as well
             model[0].weight.grad = model[0].weight.manual_grad
             optimizer.step()
-            print(f'step {step}: test loss = {getLoss(model)}')
             losses.append(getLoss(model))
         return losses
 
@@ -438,47 +431,6 @@ def test_kaczmarz_optimizer():
             losses.append(loss_fn(output, targets).item())
         return np.mean(losses)
 
-    # forward hook with self-removing backward hook
-    handles = []
-
-    def kaczmarz_grad_linear(layer: nn.Module, inputs: Tuple[torch.Tensor], output: torch.Tensor):
-        # skip over all non-leaf modules, like top-level nn.Sequential
-        if not u.is_leaf_module(layer):
-            return
-
-        # which one to use?
-        assert u._layer_type(layer) == 'Linear', f"Only linear layers supported but got {u._layer_type(layer)}"
-        assert layer.__class__ == nn.Linear
-
-        assert len(inputs) == 1, "multi-input layer??"
-        A = inputs[0].detach()
-
-        has_bias = hasattr(layer, 'bias') and layer.bias is not None
-        idx = len(handles)  # idx is used for closure trick to autoremove hook
-
-        def tensor_backwards(B):
-            # use notation of "Kaczmarz step-size"/Multiclass Layout
-            # https://notability.com/n/2TQJ3NYAK7If1~xRfL26Ap
-            (m, n) = A.shape
-
-            norms2 = (A * A).sum(axis=1)
-            if has_bias:
-                norms2 += 1
-
-            ones = torch.ones((m,)).to(device)
-            update = torch.einsum('mn,mc,m->nc', A, B, ones / norms2)
-            layer.weight.custom_grad = update.T  # B.T @ A
-
-            if has_bias:
-                # B is (m, c) residual matrix
-
-                update = torch.einsum('mc,m->c', B, ones / norms2)
-                layer.bias.custom_grad = update.T / m  # B.T.sum(axis=1)
-
-            handles[idx].remove()
-
-        handles.append(output.register_hook(tensor_backwards))
-
     def optimize(bias):
         train_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
         train_iter = u.infinite_iter(train_loader)
@@ -500,7 +452,7 @@ def test_kaczmarz_optimizer():
             data = data.to(device)
             targets = targets.to(device)
 
-            with u.module_hook(kaczmarz_grad_linear):
+            with u.module_hook(u.kaczmarz_grad_linear):
                 output = model(data)
 
             loss = loss_fn(output, targets)
@@ -531,8 +483,9 @@ def test_linear_mnist(bias=True):
     dataset1 = datasets.MNIST('../data', train=True, download=True, transform=transform)
     dataset2 = datasets.MNIST('../data', train=False, download=True, transform=transform)
 
+
     model = u.SimpleFullyConnected([28 ** 2, 10], bias=bias)
-    loss_fn = u.least_squares_loss
+    loss_fn = u.combined_nll_loss
 
     def getLoss(model, max_eval_samples=10):
         test_loader = torch.utils.data.DataLoader(dataset2, batch_size=1, shuffle=False)
@@ -571,10 +524,12 @@ def test_linear_mnist(bias=True):
         losses.append(getLoss(model))
 
     # [124.54545454545455, 83.3533919971775, 94.94022894752297, 71.47339670631018, 70.7996980888261, 29.232307191255543, 35.90959778157148, 46.41351659731431, 54.23867620820899, 55.18098633710972, 44.854006835682824, 39.05859527533705, 34.10272614522414, 33.8443342582746, 35.933635773983866, 36.40805794434114]
-    golden_losses = [124.54545454545455, 83.3533919971775, 94.94022894752297, 71.47339670631018, 70.7996980888261, 29.232307191255543,
-                     35.90959778157148, 46.41351659731431, 54.23867620820899, 55.18098633710972, 44.854006835682824, 39.05859527533705,
-                     34.10272614522414, 33.8443342582746, 35.933635773983866, 36.40805794434114]
-    np.testing.assert_allclose(losses, golden_losses)
+    #golden_losses = [124.54545454545455, 83.3533919971775, 94.94022894752297, 71.47339670631018, 70.7996980888261, 29.232307191255543,
+    #                 35.90959778157148, 46.41351659731431, 54.23867620820899, 55.18098633710972, 44.854006835682824, 39.05859527533705,
+    #                 34.10272614522414, 33.8443342582746, 35.933635773983866, 36.40805794434114]
+    golden_losses = [2.302585, 2.295276, 2.204854, 2.163034, 2.097804, 2.037777, 2.050594, 2.029167, 2.055976, 2.030072, 1.998083, 2.033249, 2.042463, 2.067483, 2.089148, 2.056059]
+
+    np.testing.assert_allclose(losses, golden_losses, rtol=1e-6, atol=1e-6)
 
 
 # End-to-end testing of toy mnist dataset

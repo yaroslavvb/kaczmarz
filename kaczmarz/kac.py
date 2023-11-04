@@ -254,7 +254,8 @@ def least_squares_loss(data: torch.Tensor, targets=None, reduction='mean', class
     # err = data - targets.view(-1, data.shape[1])
     err = data - targets
     normalizer = len(data) if reduction == 'mean' else 1
-    num_classes = targets.shape[1] if len(targets.shape) > 1 else 1
+    #num_classes = targets.shape[1] if len(targets.shape) > 1 else 1
+    num_classes = targets.shape[1]
     normalizer = normalizer * (num_classes if class_reduction == 'mean' else 1)
     return torch.sum(err * err) / 2 / normalizer
 
