@@ -142,7 +142,6 @@ def test_whitening():
 
     whiten = kac.isymsqrtStable(cov)
     cov = kac.getCov(X @ whiten)
-    print(kac.effRank(cov))
     np.testing.assert_allclose(kac.effRank(cov), 712)
 
     # after centering each example
@@ -152,7 +151,6 @@ def test_whitening():
 
     whiten = kac.isymsqrtStable(cov)
     cov = kac.getCov(X @ whiten)
-    print(kac.effRank(cov))
     np.testing.assert_allclose(kac.effRank(cov), 712)
 
 

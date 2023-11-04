@@ -47,7 +47,6 @@ def main():
     model = Net(d0=28 * 28).to(device)
     optimizer = optim.SGD(model.parameters(), lr=2/10, momentum=0.)
 
-    print("dataset size: ", len(train_dataset))
     for epoch in range(1, 10):
         model.eval()
         test_loss, correct, total = 0, 0, 0

@@ -35,8 +35,6 @@ def test_toy_multiclass_example():
 
     A = np.load(root + '/data/toy-A.npy')
     Y = np.load(root + '/data/toy-Y.npy')
-    print(A)
-    print(Y)
 
     numSteps = 5
     (m, n) = A.shape
@@ -79,9 +77,6 @@ def test_toy_multiclass_with_bias():
 
     A = np.array([[1, 0, 1], [1, 1, 1]])
     Y = np.array([[1, 2], [3, 5]])
-
-    print(A)
-    print(Y)
 
     numSteps = 5
     (m, n) = A.shape
@@ -601,10 +596,6 @@ def test_toy_mnist():
             loss = F.nll_loss(output, target)
             loss.backward()
             optimizer.step()
-            if batch_idx % 1000 == 0:
-                print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                    epoch, batch_idx * len(data), len(train_loader.dataset),
-                           100. * batch_idx / len(train_loader), loss.item()))
 
         scheduler.step()
 
