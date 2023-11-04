@@ -32,6 +32,7 @@ def main():
 
     dataset_size = 1000
     train_kwargs = {'batch_size': 1, 'num_workers': 0, 'shuffle': False}
+    train_kwargs = {'batch_size': dataset_size, 'num_workers': 0, 'shuffle': False}
     test_kwargs = {'batch_size': 1}
 
     # do_squared_loss = False
@@ -45,7 +46,7 @@ def main():
     test_dataset = kac.CustomMNIST(train=False, loss_type=loss_type, whiten_and_center=True, dataset_size=dataset_size)
 
     model = Net(d0=28 * 28).to(device)
-    optimizer = optim.SGD(model.parameters(), lr=2/10, momentum=0.)
+    optimizer = optim.SGD(model.parameters(), lr=1, momentum=0.)
 
     for epoch in range(1, 10):
         model.eval()

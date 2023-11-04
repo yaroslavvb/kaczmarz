@@ -1,10 +1,7 @@
 from typing import Tuple
 
 import numpy as np
-import torch.nn as nn
-# import wandb
 from torch.utils import tensorboard
-from torchvision import datasets, transforms
 
 import kac
 
@@ -692,6 +689,47 @@ def test_prewhitened_mnist():
     # mean 1, median 0.62    print(f"Average norm squared: {norms2.mean()}, median: {np.quantile(norms2,.5)}")
     np.testing.assert_allclose(norms2.mean(), 1)
     np.testing.assert_allclose((means * means).sum(), 0, atol=1e-6)
+
+
+def test_whitening():
+    """Following values from "Whiten MNIST" of linear-estimation.nb, and tolga-mnist-whitening"""
+
+    dataset = kac.CustomMNIST()
+    loader = torch.utils.data.DataLoader(dataset, batch_size=60000, shuffle=False)
+    X, Y = next(iter(loader))
+    X = X.double().reshape(-1, 28 * 28)
+
+    cov = kac.getCov(X).cpu().numpy()
+    np.testing.assert_allclose(kac.effRank(cov), 5.044191669053714)
+
+    whiten = kac.isymsqrtStable(cov)
+    cov = kac.getCov(X @ whiten)
+    np.testing.assert_allclose(kac.effRank(cov), 712)
+
+    # after centering each example
+    X = X - X.mean(dim=1, keepdim=True)
+    cov = kac.getCov(X).cpu().numpy()
+    np.testing.assert_allclose(kac.effRank(cov),  8.43133453309047)
+
+    whiten = kac.isymsqrtStable(cov)
+    cov = kac.getCov(X @ whiten)
+    np.testing.assert_allclose(kac.effRank(cov), 712)
+
+
+def test_mnist_whitening():
+    dataset = kac.CustomMNIST(train=True, whiten_and_center=True)
+    loader = torch.utils.data.DataLoader(dataset, batch_size=60000, shuffle=False)
+    X, Y = next(iter(loader))
+    X = X.double().reshape(-1, 28 * 28)
+    assert(kac.effRank(kac.getCov(X)) > 711)   # actual rank is slightly smaller than 712, maybe due to float32 downcast
+
+    assert 60000 <= np.trace(X.T @ X) <= 60040
+
+    dataset = kac.CustomMNIST(train=False, whiten_and_center=True)
+    loader = torch.utils.data.DataLoader(dataset, batch_size=10000, shuffle=False)
+    X, Y = next(iter(loader))
+    X = X.double().reshape(-1, 28 * 28)
+    assert(int(kac.effRank(kac.getCov(X))) == 33)
 
 
 
