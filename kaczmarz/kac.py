@@ -576,13 +576,13 @@ def isymsqrtStable(cov: np.ndarray):
     """
 
     cov = cov.cpu().numpy() if hasattr(cov, 'cpu') else cov
-    mat = cov.astype(np.float64)
+    cov = cov.astype(np.float64)
 
-    U, s, Vh = scipy.linalg.svd(mat, lapack_driver='gesvd')
-    eps = np.finfo(mat.dtype).eps
+    U, s, Vh = scipy.linalg.svd(cov, lapack_driver='gesvd')
+    eps = np.finfo(cov.dtype).eps
 
     # For cutoff discussion, see https://github.com/scipy/scipy/issues/10879
-    cutoff = np.max(s) * max(mat.shape) * eps
+    cutoff = np.max(s) * max(cov.shape) * eps
 
     indices = np.where(s < cutoff)[0]   # indices of svals below cutoff, could be empty
     rank = min(indices) if len(indices) else len(s)
