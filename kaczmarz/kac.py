@@ -16,20 +16,8 @@ import scipy # for gesvd
 
 mnistTrainWhiteningMatrix = None
 
-# import globals as gl
-
 # to enable referring to functions in its own module as u.func
-import kaczmarz.kac
-
-u = sys.modules[__name__]
-
-# def log_scalars(metrics: Dict[str, Any]) -> None:
-#    assert gl.event_writer is not None, "initialize event_writer as gl.event_writer = SummaryWriter(logdir)"
-#    for tag in metrics:
-#        gl.event_writer.add_scalar(tag=tag, scalar_value=metrics[tag], global_step=gl.get_global_step())
-#        # gl.event_writer.add_s
-#    if 'epoch' in metrics:
-#        print('logging at ', gl.get_global_step(), metrics.get('epoch', -1))
+# u = sys.modules[__name__]
 
 
 global_timeit_dict = {}
@@ -349,7 +337,7 @@ class CustomMNIST(datasets.MNIST):
 
                 # normalize examples to have E[x^2]/E[x^4]=1, see "Adjustment for fourth-moment normalization" in linear-estimation.nb
                 W = W * 0.0184887
-                CustomMNIST.mnistTrainWhiteningMatrix = torch.tensor(W, device=device)
+                CustomMNIST.mnistTrainWhiteningMatrix = torch.tensor(W, device='cpu')  # do on CPU because GPU numerics weren't tested
 
         if dataset_size > 0:
             self.data = self.data[:dataset_size, :, :]
@@ -366,12 +354,12 @@ class CustomMNIST(datasets.MNIST):
             self.data = torch.from_numpy(new_data).type(torch.get_default_dtype())
 
         if whiten_and_center:
-            data = self.data
-            data = data.reshape(data.shape[0], -1).double()
+            data = self.data.cpu().double()
+            data = data.reshape(data.shape[0], -1)
             data = data - torch.mean(data, dim=1, keepdim=True)
             data = data @ CustomMNIST.mnistTrainWhiteningMatrix
             data = data.reshape(-1, 28, 28)
-            self.data = data
+            self.data = data.cuda() if torch.cuda.is_available() else data
 
         # insert channel dimension
         self.data = self.data.type(torch.get_default_dtype()).unsqueeze(1)
