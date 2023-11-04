@@ -250,7 +250,7 @@ def test_toy_multiclass_pytorch():
         return np.mean(losses)
 
     model = u.SimpleFullyConnected([2, 2])
-    loss_fn = u.least_squares_loss
+    loss_fn = u.least_squares_loss_add_classes
     optimizer = torch.optim.SGD(model.parameters(), lr=1, momentum=0)
 
     num_steps = 5
@@ -282,7 +282,7 @@ def test_d1000_pytorch():
     train_iter = u.infinite_iter(train_loader)
     test_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
 
-    loss_fn = u.least_squares_loss
+    loss_fn = u.least_squares_loss_add_classes
 
     def getLoss(model):
         losses = []
@@ -332,7 +332,7 @@ def test_manual_optimizer():
 
     dataset = u.ToyDataset()
     test_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
-    loss_fn = u.least_squares_loss
+    loss_fn = u.least_squares_loss_add_classes
 
     def getLoss(model):
         losses = []
@@ -427,7 +427,7 @@ def test_kaczmarz_optimizer():
 
     dataset = u.ToyDataset()
     test_loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
-    loss_fn = u.least_squares_loss
+    loss_fn = u.least_squares_loss_add_classes
 
     def getLoss(model):
         losses = []

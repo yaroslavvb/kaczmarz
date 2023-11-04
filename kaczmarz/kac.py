@@ -238,8 +238,15 @@ def is_matrix(dd) -> bool:
     return len(shape) == 2 and shape[0] >= 1 and shape[1] >= 1
 
 
-def least_squares_loss(data: torch.Tensor, targets=None, reduction='mean'):
-    """Least squares loss (like MSELoss, but an extra 1/2 factor."""
+def least_squares_loss_add_classes(data: torch.Tensor, targets=None, reduction='mean'):
+    return least_squares_loss(data, targets, reduction, class_reduction='sum')
+
+def least_squares_loss(data: torch.Tensor, targets=None, reduction='mean', class_reduction='mean'):
+    """Least squares loss (like MSELoss), but an extra 1/2 factor.
+
+    reduction and class_reduction determine whether to average or add batch elements/class elements respectively
+    """
+
     assert is_matrix(data), f"Expected matrix, got {data.shape}"
     assert reduction in ('mean', 'sum')
     if targets is None:
@@ -247,6 +254,8 @@ def least_squares_loss(data: torch.Tensor, targets=None, reduction='mean'):
     # err = data - targets.view(-1, data.shape[1])
     err = data - targets
     normalizer = len(data) if reduction == 'mean' else 1
+    num_classes = targets.shape[1] if len(targets.shape) > 1 else 1
+    normalizer = normalizer * (num_classes if class_reduction == 'mean' else 1)
     return torch.sum(err * err) / 2 / normalizer
 
 

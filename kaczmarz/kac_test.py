@@ -63,7 +63,7 @@ def test_toy_dataset():
 def test_least_squares_loss():
     y = torch.Tensor(u.to_numpy([[0, 0], [0, 0]]))
     y0 = torch.Tensor(u.to_numpy([[1, 2], [3, 5]]))
-    u.check_equal(u.least_squares_loss(y, y0), 39 / 4)
+    u.check_equal(u.least_squares_loss(y, y0, class_reduction='sum'), 39 / 4)
 
 def test_simple_fully_connected():
     net = u.SimpleFullyConnected([28**2, 2, 10], nonlin=True, bias=True, init_scale=1)
