@@ -337,13 +337,15 @@ class CustomMNIST(datasets.MNIST):
                 data = self.data
                 data = data.reshape(data.shape[0], -1)
                 A = data - torch.mean(data.float(), dim=1, keepdim=True)
-                cov = A.T @ A
+                #  cov = A.T @ A
+                cov = getCov(A)
                 W = isymsqrtStable(cov)
 
                 B = A @ W
 
                 # 712 non-zero eigs, 60000 examples, normalize to have examples with unit norm on average
-                W = W * np.sqrt(60000 / 712)
+                # W = W * np.sqrt(60000 / 712)
+                W = W / np.sqrt(712)
                 CustomMNIST.mnistTrainWhiteningMatrix = torch.tensor(W, device=device)
 
         if dataset_size > 0:
@@ -594,7 +596,8 @@ def effRank(mat):
 
 
 def getCov(mat):
-    return mat.T @ mat
+    m = mat.shape[0]
+    return mat.T @ mat / m
 
 
 @contextmanager
