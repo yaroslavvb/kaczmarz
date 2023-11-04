@@ -254,7 +254,7 @@ def least_squares_loss(data: torch.Tensor, targets=None, reduction='mean', class
     # err = data - targets.view(-1, data.shape[1])
     err = data - targets
     normalizer = len(data) if reduction == 'mean' else 1
-    #num_classes = targets.shape[1] if len(targets.shape) > 1 else 1
+    assert len(targets.shape) == 2, f"Expected rank-2 target shape, instead see shape {targets.shape}"
     num_classes = targets.shape[1]
     normalizer = normalizer * (num_classes if class_reduction == 'mean' else 1)
     return torch.sum(err * err) / 2 / normalizer
@@ -658,9 +658,8 @@ def kaczmarz_grad_linear(layer: nn.Module, inputs: Tuple[torch.Tensor], output: 
 
         if has_bias:
             # B is (m, c) residual matrix
-
             update = torch.einsum('mc,m->c', B, ones / norms2)
-            layer.bias.custom_grad = update.T / m  # B.T.sum(axis=1)
+            layer.bias.custom_grad = update / m
 
     existing_hooks = output._backward_hooks
     assert existing_hooks is None, f"Tensor already has backward hooks, {existing_hooks}, potential bug if we forgot to remove previous hooks"
