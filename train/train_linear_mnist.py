@@ -24,8 +24,8 @@ root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 
 def main():
-    do_kaczmarz = False
     do_kaczmarz = True
+    do_kaczmarz = False
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     torch.manual_seed(1)
@@ -39,10 +39,10 @@ def main():
     loss_type = 'LeastSquares' if do_squared_loss else 'CrossEntropy'
     loss_fn = kac.least_squares_loss if do_squared_loss else kac.combined_nll_loss
 
-    train_dataset = kac.TinyMNIST(train=True, loss_type=loss_type, whiten_and_center=True, dataset_size=dataset_size)
+    train_dataset = kac.CustomMNIST(train=True, loss_type=loss_type, whiten_and_center=True, dataset_size=dataset_size)
     train_loader = torch.utils.data.DataLoader(train_dataset, **train_kwargs)
 
-    test_dataset = kac.TinyMNIST(train=False, loss_type=loss_type, whiten_and_center=True, dataset_size=dataset_size)
+    test_dataset = kac.CustomMNIST(train=False, loss_type=loss_type, whiten_and_center=True, dataset_size=dataset_size)
 
     model = Net(d0=28 * 28).to(device)
     optimizer = optim.SGD(model.parameters(), lr=2/10, momentum=0.)

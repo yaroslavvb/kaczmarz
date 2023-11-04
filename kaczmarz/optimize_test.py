@@ -615,10 +615,10 @@ def test_toy_mnist():
         train_kwargs.update(cuda_kwargs)
         test_kwargs.update(cuda_kwargs)
 
-    train_dataset = u.TinyMNIST(data_width=28, dataset_size=dataset_size, train=True)
+    train_dataset = u.CustomMNIST(data_width=28, dataset_size=dataset_size, train=True)
     train_loader = torch.utils.data.DataLoader(train_dataset, **train_kwargs)
 
-    test_dataset = u.TinyMNIST(data_width=28, dataset_size=dataset_size, train=False)
+    test_dataset = u.CustomMNIST(data_width=28, dataset_size=dataset_size, train=False)
     model = Net().to(device)
     optimizer = optim.Adadelta(model.parameters(), lr=1.0)
 
@@ -694,10 +694,10 @@ def test_toy_mnist_sqloss():
     loss_fn = u.least_squares_loss if do_squared_loss else u.combined_nll_loss
     loss_type = 'LeastSquares' if do_squared_loss else 'CrossEntropy'
 
-    train_dataset = u.TinyMNIST(data_width=28, dataset_size=dataset_size, train=True, loss_type=loss_type)
+    train_dataset = u.CustomMNIST(data_width=28, dataset_size=dataset_size, train=True, loss_type=loss_type)
     train_loader = torch.utils.data.DataLoader(train_dataset, **train_kwargs)
 
-    test_dataset = u.TinyMNIST(data_width=28, dataset_size=dataset_size, train=False, loss_type=loss_type)
+    test_dataset = u.CustomMNIST(data_width=28, dataset_size=dataset_size, train=False, loss_type=loss_type)
     model = Net().to(device)
 
     optimizer = optim.SGD(model.parameters(), lr=1e-5, momentum=0)
@@ -735,10 +735,10 @@ def test_toy_mnist_sqloss():
             output = model(data)
             # new_loss = F.nll_loss(output, target)
             new_loss = loss_fn(output, target)
-        print(f"correct: {correct}, test_loss: {test_loss:.2f}, old train loss: {loss.item():.2f}, new train loss: {new_loss.item():.2f}")
+        # print(f"correct: {correct}, test_loss: {test_loss:.2f}, old train loss: {loss.item():.2f}, new train loss: {new_loss.item():.2f}")
 
 
-def test_whitened_mnist():
+def test_prewhitened_mnist():
     A = np.load(root + '/data/mnistTrainW.npy')
     norms2 = (A * A).sum(axis=1)
     means = A.sum(axis=1)

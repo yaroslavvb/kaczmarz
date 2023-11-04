@@ -85,11 +85,11 @@ def test_simple_fully_connected():
     assert torch.allclose(net(image), torch.tensor([[1., 1., 0., 0., 0., 0., 0., 0., 0., 0.]]))
 
 def test_tiny_mnist():
-    dataset1 = u.TinyMNIST(train=True, )
-    dataset2 = u.TinyMNIST(train=False)
+    dataset1 = u.CustomMNIST(train=True, )
+    dataset2 = u.CustomMNIST(train=False)
 
-    dataset1 = u.TinyMNIST(data_width=28, dataset_size=100, train=True, loss_type='CrossEntropy')
-    dataset2 = u.TinyMNIST(data_width=28, dataset_size=100, train=False, loss_type='CrossEntropy')
+    dataset1 = u.CustomMNIST(data_width=28, dataset_size=100, train=True, loss_type='CrossEntropy')
+    dataset2 = u.CustomMNIST(data_width=28, dataset_size=100, train=False, loss_type='CrossEntropy')
 
     loader1 = torch.utils.data.DataLoader(dataset1, batch_size=1, shuffle=False)
     loader2 = torch.utils.data.DataLoader(dataset2, batch_size=1, shuffle=False)
@@ -107,8 +107,8 @@ def test_tiny_mnist():
     assert data1.shape == (2, 1, 28, 28)   # B x C x H x W
     assert data2.shape == (3, 1, 28, 28)   # B x C x H x W
 
-    dataset1 = u.TinyMNIST(train=True, loss_type='LeastSquares')
-    dataset2 = u.TinyMNIST(train=False, loss_type='LeastSquares')
+    dataset1 = u.CustomMNIST(train=True, loss_type='LeastSquares')
+    dataset2 = u.CustomMNIST(train=False, loss_type='LeastSquares')
 
     loader1 = torch.utils.data.DataLoader(dataset1, batch_size=1, shuffle=False)
     loader2 = torch.utils.data.DataLoader(dataset2, batch_size=1, shuffle=False)
@@ -129,10 +129,10 @@ def test_isymsqrtStable():
     np.testing.assert_allclose(covW, torch.eye(2), atol=1e-10)
 
 
-def test_mnist_whitening():
+def test_whitening():
     """Following values from "Whiten MNIST" of linear-estimation.nb, and tolga-mnist-whitening"""
 
-    dataset = kac.TinyMNIST()
+    dataset = kac.CustomMNIST()
     loader = torch.utils.data.DataLoader(dataset, batch_size=60000, shuffle=False)
     X, Y = next(iter(loader))
     X = X.double().reshape(-1, 28 * 28)
@@ -156,18 +156,16 @@ def test_mnist_whitening():
     np.testing.assert_allclose(kac.effRank(cov), 712)
 
 
-def test_tiny_mnist_whiten():
-    train = kac.TinyMNIST(whiten_and_center=True)
-
-    dataset = kac.TinyMNIST(train=True, whiten_and_center=True)
+def test_mnist_whitening():
+    dataset = kac.CustomMNIST(train=True, whiten_and_center=True)
     loader = torch.utils.data.DataLoader(dataset, batch_size=60000, shuffle=False)
     X, Y = next(iter(loader))
     X = X.double().reshape(-1, 28 * 28)
-    assert(kac.effRank(kac.getCov(X)) > 711)   # actual rank is slightly smaller due to float32 downcast
+    assert(kac.effRank(kac.getCov(X)) > 711)   # actual rank is slightly smaller than 712, maybe due to float32 downcast
 
     assert 60000 <= np.trace(X.T @ X) <= 60040
 
-    dataset = kac.TinyMNIST(train=False, whiten_and_center=True)
+    dataset = kac.CustomMNIST(train=False, whiten_and_center=True)
     loader = torch.utils.data.DataLoader(dataset, batch_size=10000, shuffle=False)
     X, Y = next(iter(loader))
     X = X.double().reshape(-1, 28 * 28)

@@ -16,7 +16,7 @@ def one_hot_decode(Y):
     return newY
 
 def main():
-    dataset = kac.TinyMNIST(train=True)
+    dataset = kac.CustomMNIST(train=True)
     loader = torch.utils.data.DataLoader(dataset, batch_size=60000, shuffle=False)
     X, Y = next(iter(loader))
     Y = one_hot_decode(Y)
@@ -25,7 +25,7 @@ def main():
     np.save(root + '/data/mnistTrain.npy', X0)
     np.save(root + '/data/mnistTrain-labels.npy', Y0)
 
-    dataset = kac.TinyMNIST(train=False)
+    dataset = kac.CustomMNIST(train=False)
     loader = torch.utils.data.DataLoader(dataset, batch_size=10000, shuffle=False)
     X, Y = next(iter(loader))
     Y = one_hot_decode(Y)

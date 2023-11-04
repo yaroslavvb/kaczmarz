@@ -106,16 +106,7 @@ def test_manual_grad_computation():
     with module_hook(manual_grad_linear):
         outputs = model(data)
 
-    def least_squares_loss(data, targets=None, aggregation='mean'):
-        """Least squares loss (like MSELoss, but an extra 1/2 factor."""
-        assert aggregation in ('mean', 'sum')
-        if targets is None:
-            targets = torch.zeros_like(data)
-        err = data - targets.view(-1, data.shape[1])
-        normalizer = len(data) if aggregation == 'mean' else 1
-        return torch.sum(err * err) / 2 / normalizer
-
-    loss = least_squares_loss(outputs)
+    loss = u.least_squares_loss(outputs)
     loss.backward()
 
     for i in range(len(model)):

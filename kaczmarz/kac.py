@@ -300,7 +300,7 @@ class ToyDataset(NumpyDataset):
         return len(self.data)
 
 
-class TinyMNIST(datasets.MNIST):
+class CustomMNIST(datasets.MNIST):
     """Custom-size MNIST autoencoder dataset with extra features. Generates data/target images with reduced resolution and 0
     channels.
 
@@ -308,6 +308,8 @@ class TinyMNIST(datasets.MNIST):
 
 
     """
+
+    mnistTrainWhiteningMatrix = None
 
     def __init__(self, dataset_root='../data', data_width=28, dataset_size=0, train=True, loss_type='CrossEntropy', device=None,
                  whiten_and_center=False):
@@ -320,8 +322,6 @@ class TinyMNIST(datasets.MNIST):
             normalize: if True, centers and whitens dataset
         """
 
-        global mnistTrainWhiteningMatrix
-
         if device is None:
             device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -330,9 +330,9 @@ class TinyMNIST(datasets.MNIST):
 
         # compute whitening matrix. Can only be done on training data MNIST
         if whiten_and_center:
-            assert train or mnistTrainWhiteningMatrix is not None
+            assert train or CustomMNIST.mnistTrainWhiteningMatrix is not None
 
-            if mnistTrainWhiteningMatrix is None:
+            if CustomMNIST.mnistTrainWhiteningMatrix is None:
                 data = self.data
                 data = data.reshape(data.shape[0], -1)
                 A = data - torch.mean(data.float(), dim=1, keepdim=True)
@@ -343,7 +343,7 @@ class TinyMNIST(datasets.MNIST):
 
                 # 712 non-zero eigs, 60000 examples, normalize to have examples with unit norm on average
                 W = W * np.sqrt(60000 / 712)
-                mnistTrainWhiteningMatrix = torch.tensor(W, device=device)
+                CustomMNIST.mnistTrainWhiteningMatrix = torch.tensor(W, device=device)
 
         if dataset_size > 0:
             self.data = self.data[:dataset_size, :, :]
@@ -363,7 +363,7 @@ class TinyMNIST(datasets.MNIST):
             data = self.data
             data = data.reshape(data.shape[0], -1).double()
             data = data - torch.mean(data, dim=1, keepdim=True)
-            data = data @ mnistTrainWhiteningMatrix
+            data = data @ CustomMNIST.mnistTrainWhiteningMatrix
             data = data.reshape(-1, 28, 28)
             self.data = data
 
@@ -561,21 +561,29 @@ def symsqrt(mat, cond=None, return_rank=False, inverse=False):
 def isymsqrtStable(cov: np.ndarray):
     """Stable inverse square root.
 
-    Use GESVD algorithm, GESDD is known to have problems with ill-conditioned matrices, see
-    https://discourse.julialang.org/t/svd-better-default-to-gesvd-instead-of-gesdd/20603
-
     Use float64 precision
     Don't double tiny dimensions
+
+    Use GESVD algorithm, GESDD is known to have problems with ill-conditioned matrices, see
+    https://github.com/tensorflow/tensorflow/issues/9234
+    https://github.com/pytorch/pytorch/pull/11194#issuecomment-418421118
+    https://github.com/tensorflow/tensorflow/issues/26842
+    https://discourse.julialang.org/t/svd-better-default-to-gesvd-instead-of-gesdd/20603
+
     """
 
     cov = cov.cpu().numpy() if hasattr(cov, 'cpu') else cov
     mat = cov.astype(np.float64)
-    U, s, Vh = scipy.linalg.svd(mat, lapack_driver='gesvd')
-    # For cutoff discussion, see https://github.com/scipy/scipy/issues/10879
-    cutoff = np.max(s) * max(mat.shape) * np.finfo(mat.dtype).eps
-    # sdiv = np.array(list(1/ np.sqrt(val) if val > cutoff else val for val in s))
 
-    return U @ np.diag(np.where(s > cutoff, 1 / np.sqrt(s), s) ) @ Vh
+    U, s, Vh = scipy.linalg.svd(mat, lapack_driver='gesvd')
+    eps = np.finfo(mat.dtype).eps
+
+    # For cutoff discussion, see https://github.com/scipy/scipy/issues/10879
+    cutoff = np.max(s) * max(mat.shape) * eps
+
+    indices = np.where(s < cutoff)[0]   # indices of svals below cutoff, could be empty
+    rank = min(indices) if len(indices) else len(s)
+    return U[:, :rank] @ np.diag(1/np.sqrt(s[:rank])) @ Vh[:rank]
 
 
 def effRank(mat):
