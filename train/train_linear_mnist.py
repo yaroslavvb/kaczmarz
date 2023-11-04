@@ -32,7 +32,6 @@ def main():
 
     dataset_size = 1000
     train_kwargs = {'batch_size': 1, 'num_workers': 0, 'shuffle': False}
-    train_kwargs = {'batch_size': dataset_size, 'num_workers': 0, 'shuffle': False}
     test_kwargs = {'batch_size': 1}
 
     # do_squared_loss = False

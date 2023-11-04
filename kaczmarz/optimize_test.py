@@ -721,11 +721,12 @@ def test_whitened_mnist():
     loader = torch.utils.data.DataLoader(dataset, batch_size=60000, shuffle=False)
     X, Y = next(iter(loader))
     X = X.double().reshape(-1, 28 * 28)
-    assert(kac.effRank(kac.getCov(X)) > 711)   # actual rank is slightly smaller than 712, maybe due to float32 downcast
 
+    assert(kac.effRank(kac.getCov(X)) > 711)   # actual rank is slightly smaller than 712, maybe due to float32 downcast
     assert 60000 <= np.trace(X.T @ X) <= 60040
 
-    print("Average norm2: ", np.trace(kac.getCov(X)))
+    # average example norm is 1
+    np.testing.assert_allclose(np.trace(kac.getCov(X)), 1, atol=1e-3, rtol=1e-3)
 
     dataset = kac.CustomMNIST(train=False, whiten_and_center=True)
     loader = torch.utils.data.DataLoader(dataset, batch_size=10000, shuffle=False)
