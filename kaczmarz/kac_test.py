@@ -26,7 +26,8 @@ import torch.nn.functional as F
 import inspect
 import time
 
-import kac as u
+import kac
+u = kac
 
 def test_kron():
     """Test kron, vec and vecr identities"""
@@ -118,6 +119,59 @@ def test_tiny_mnist():
     assert torch.allclose(targets2, torch.tensor([[0., 0, 0, 0, 0, 0, 0, 1, 0, 0]]))
 
 
+def test_isymsqrtStable():
+    X = np.array([[1, 2], [3, 4]])
+    cov = X.T @ X
+    whiten = kac.isymsqrtStable(cov)
+
+    Y = X @ whiten
+    covW = Y.T @ Y
+    np.testing.assert_allclose(covW, torch.eye(2), atol=1e-10)
+
+
+def test_mnist_whitening():
+    """Following values from "Whiten MNIST" of linear-estimation.nb, and tolga-mnist-whitening"""
+
+    dataset = kac.TinyMNIST()
+    loader = torch.utils.data.DataLoader(dataset, batch_size=60000, shuffle=False)
+    X, Y = next(iter(loader))
+    X = X.double().reshape(-1, 28 * 28)
+
+    cov = kac.getCov(X).cpu().numpy()
+    np.testing.assert_allclose(kac.effRank(cov), 5.044191669053714)
+
+    whiten = kac.isymsqrtStable(cov)
+    cov = kac.getCov(X @ whiten)
+    print(kac.effRank(cov))
+    np.testing.assert_allclose(kac.effRank(cov), 712)
+
+    # after centering each example
+    X = X - X.mean(dim=1, keepdim=True)
+    cov = kac.getCov(X).cpu().numpy()
+    np.testing.assert_allclose(kac.effRank(cov),  8.43133453309047)
+
+    whiten = kac.isymsqrtStable(cov)
+    cov = kac.getCov(X @ whiten)
+    print(kac.effRank(cov))
+    np.testing.assert_allclose(kac.effRank(cov), 712)
+
+
+def test_tiny_mnist_whiten():
+    train = kac.TinyMNIST(whiten_and_center=True)
+
+    dataset = kac.TinyMNIST(train=True, whiten_and_center=True)
+    loader = torch.utils.data.DataLoader(dataset, batch_size=60000, shuffle=False)
+    X, Y = next(iter(loader))
+    X = X.double().reshape(-1, 28 * 28)
+    assert(kac.effRank(kac.getCov(X)) > 711)   # actual rank is slightly smaller due to float32 downcast
+
+    assert 60000 <= np.trace(X.T @ X) <= 60040
+
+    dataset = kac.TinyMNIST(train=False, whiten_and_center=True)
+    loader = torch.utils.data.DataLoader(dataset, batch_size=10000, shuffle=False)
+    X, Y = next(iter(loader))
+    X = X.double().reshape(-1, 28 * 28)
+    assert(int(kac.effRank(kac.getCov(X))) == 33)
 
 
 if __name__ == '__main__':

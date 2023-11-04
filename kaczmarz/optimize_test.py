@@ -6,7 +6,9 @@ import torch.nn as nn
 from torch.utils import tensorboard
 from torchvision import datasets, transforms
 
-import kac as u
+import kac
+
+u = kac
 
 import torch.nn as nn
 import torch.nn.functional as F
@@ -15,6 +17,7 @@ from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import StepLR
 
 import os
+
 root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 
@@ -30,8 +33,8 @@ def test_toy_multiclass_example():
     # Data gen "Exporting  toy multiclass example to numpy array" of
     # https://www.wolframcloud.com/obj/yaroslavvb/nn-linear/linear-estimation.nb
 
-    A = np.load(root+'/data/toy-A.npy')
-    Y = np.load(root+'/data/toy-Y.npy')
+    A = np.load(root + '/data/toy-A.npy')
+    Y = np.load(root + '/data/toy-Y.npy')
     print(A)
     print(Y)
 
@@ -118,8 +121,8 @@ def test_toy_multiclass_with_bias():
 
 
 def test_d10_example():
-    A = np.load(root+'/data/d10-A.npy')
-    Y = np.load(root+'/data/d10-Y.npy')
+    A = np.load(root + '/data/d10-A.npy')
+    Y = np.load(root + '/data/d10-Y.npy')
 
     (m, n) = A.shape
     (m0, c) = Y.shape
@@ -148,8 +151,8 @@ def test_d10_example():
 
 
 def test_d1000_example():
-    A = np.load(root+'/data/d1000-A.npy')
-    Y = np.load(root+'/data/d1000-Y.npy')
+    A = np.load(root + '/data/d1000-A.npy')
+    Y = np.load(root + '/data/d1000-Y.npy')
 
     (m, n) = A.shape
     (m0, c) = Y.shape
@@ -189,8 +192,8 @@ def test_d1000_example():
 
 
 def test_d1000c_example():
-    A = np.load(root+'/data/d1000c-A.npy')
-    Y = np.load(root+'/data/d1000c-Y.npy')
+    A = np.load(root + '/data/d1000c-A.npy')
+    Y = np.load(root + '/data/d1000c-Y.npy')
 
     (m, n) = A.shape
     (m0, c) = Y.shape
@@ -268,9 +271,8 @@ def test_toy_multiclass_pytorch():
 
 
 def test_d1000_pytorch():
-
-    A = np.load(root+'/data/d1000-A.npy')
-    Y = np.load(root+'/data/d1000-Y.npy')
+    A = np.load(root + '/data/d1000-A.npy')
+    Y = np.load(root + '/data/d1000-Y.npy')
     (m, n) = A.shape
     (m0, c) = Y.shape
     assert m0 == m
@@ -653,6 +655,7 @@ def test_toy_mnist():
 
     assert correct == 5
 
+
 def test_toy_mnist_sqloss():
     class Net(nn.Module):
         def __init__(self):
@@ -699,7 +702,7 @@ def test_toy_mnist_sqloss():
 
     optimizer = optim.SGD(model.parameters(), lr=1e-5, momentum=0)
 
-    for epoch in range(1, num_epochs+1):
+    for epoch in range(1, num_epochs + 1):
         model.eval()
         test_loss, correct = 0, 0
 
@@ -734,14 +737,17 @@ def test_toy_mnist_sqloss():
             new_loss = loss_fn(output, target)
         print(f"correct: {correct}, test_loss: {test_loss:.2f}, old train loss: {loss.item():.2f}, new train loss: {new_loss.item():.2f}")
 
+
 def test_whitened_mnist():
-    A = np.load(root+'/data/mnistTrainW.npy')
-    norms2 = (A*A).sum(axis=1)
+    A = np.load(root + '/data/mnistTrainW.npy')
+    norms2 = (A * A).sum(axis=1)
     means = A.sum(axis=1)
 
     # mean 1, median 0.62    print(f"Average norm squared: {norms2.mean()}, median: {np.quantile(norms2,.5)}")
     np.testing.assert_allclose(norms2.mean(), 1)
-    np.testing.assert_allclose((means*means).sum(), 0, atol=1e-6)
+    np.testing.assert_allclose((means * means).sum(), 0, atol=1e-6)
+
+
 
 if __name__ == '__main__':
     # test_d10_example()

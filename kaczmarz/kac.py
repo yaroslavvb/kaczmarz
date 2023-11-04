@@ -1,5 +1,6 @@
 import gc
 import inspect
+import math
 import sys
 import time
 from contextlib import contextmanager
@@ -10,6 +11,10 @@ import torch.nn.functional as F
 import torchvision.datasets as datasets
 # import wandb
 from PIL import Image
+
+import scipy # for gesvd
+
+mnistTrainWhiteningMatrix = None
 
 # import globals as gl
 
@@ -287,7 +292,7 @@ class ToyDataset(NumpyDataset):
 
 
 class TinyMNIST(datasets.MNIST):
-    """Custom-size MNIST autoencoder dataset for debugging. Generates data/target images with reduced resolution and 0
+    """Custom-size MNIST autoencoder dataset with extra features. Generates data/target images with reduced resolution and 0
     channels.
 
     Use original_targets kwarg to get original MNIST labels instead of autoencoder targets.
@@ -296,7 +301,7 @@ class TinyMNIST(datasets.MNIST):
     """
 
     def __init__(self, dataset_root='../data', data_width=28, dataset_size=0, train=True, loss_type='CrossEntropy', device=None,
-                 whiteningMatrix=None, whiten=False):
+                 whiten_and_center=False):
         """
 
         Args:
@@ -306,6 +311,8 @@ class TinyMNIST(datasets.MNIST):
             normalize: if True, centers and whitens dataset
         """
 
+        global mnistTrainWhiteningMatrix
+
         if device is None:
             device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -313,30 +320,28 @@ class TinyMNIST(datasets.MNIST):
         assert loss_type in [None, 'LeastSquares', 'CrossEntropy']
 
         # compute whitening matrix. Can only be done on training data MNIST
-        if whiten:
-            assert train or whiteningMatrix is not None
+        if whiten_and_center:
+            assert train or mnistTrainWhiteningMatrix is not None
 
-            if whiteningMatrix is None:
+            if mnistTrainWhiteningMatrix is None:
                 data = self.data
                 data = data.reshape(data.shape[0], -1)
                 A = data - torch.mean(data.float(), dim=1, keepdim=True)
                 cov = A.T @ A
-                w = isymsqrt(cov)
+                W = isymsqrtStable(cov)
 
-                B = A @ whiten
-                totalNorm = (B * B).sum()
-                correction = torch.sqrt(totalNorm / data.shape[0])
-                whiteningMatrix = w / correction
-                self.whiteningMatix = whiteningMatrix
-            else:
-                self.whiteningMatix = whiteningMatrix
+                B = A @ W
+
+                # 712 non-zero eigs, 60000 examples, normalize to have examples with unit norm on average
+                W = W * np.sqrt(60000 / 712)
+                mnistTrainWhiteningMatrix = torch.tensor(W, device=device)
 
         if dataset_size > 0:
             self.data = self.data[:dataset_size, :, :]
             self.targets = self.targets[:dataset_size]
 
         if data_width != 28:
-            assert not whiten, "Whitening only supported for default size images"
+            assert not whiten_and_center, "Whitening only supported for default size images"
             new_data = np.zeros((self.data.shape[0], data_width, data_width))
             for i in range(self.data.shape[0]):
                 arr = self.data[i, :].numpy().astype(np.uint8)
@@ -344,15 +349,17 @@ class TinyMNIST(datasets.MNIST):
                 im.thumbnail((data_width, data_width), Image.ANTIALIAS)
                 new_data[i, :, :] = np.array(im) / 255
             self.data = torch.from_numpy(new_data).type(torch.get_default_dtype())
-        else:
-            if whiten:
-                data = self.data
-                data = data - torch.mean(data, dim=1)
-                data = data.reshape(data.shape[0], -1)
-                data = data @ self.whiteningMatrix
-                data = data.reshape(-1, 28, 28)
-                self.data = data
-            self.data = self.data.type(torch.get_default_dtype()).unsqueeze(1)
+
+        if whiten_and_center:
+            data = self.data
+            data = data.reshape(data.shape[0], -1).double()
+            data = data - torch.mean(data, dim=1, keepdim=True)
+            data = data @ mnistTrainWhiteningMatrix
+            data = data.reshape(-1, 28, 28)
+            self.data = data
+
+        # insert channel dimension
+        self.data = self.data.type(torch.get_default_dtype()).unsqueeze(1)
 
         if loss_type == 'LeastSquares':  # convert to one-hot format
             new_targets = torch.zeros((self.targets.shape[0], 10))
@@ -540,6 +547,36 @@ def symsqrt(mat, cond=None, return_rank=False, inverse=False):
         return B, len(sigma_diag)
     else:
         return B
+
+
+def isymsqrtStable(cov: np.ndarray):
+    """Stable inverse square root.
+
+    Use GESVD algorithm, GESDD is known to have problems with ill-conditioned matrices, see
+    https://discourse.julialang.org/t/svd-better-default-to-gesvd-instead-of-gesdd/20603
+
+    Use float64 precision
+    Don't double tiny dimensions
+    """
+
+    cov = cov.cpu().numpy() if hasattr(cov, 'cpu') else cov
+    mat = cov.astype(np.float64)
+    U, s, Vh = scipy.linalg.svd(mat, lapack_driver='gesvd')
+    # For cutoff discussion, see https://github.com/scipy/scipy/issues/10879
+    cutoff = np.max(s) * max(mat.shape) * np.finfo(mat.dtype).eps
+    # sdiv = np.array(list(1/ np.sqrt(val) if val > cutoff else val for val in s))
+
+    return U @ np.diag(np.where(s > cutoff, 1 / np.sqrt(s), s) ) @ Vh
+
+
+def effRank(mat):
+    mat = np.array(mat.cpu() if hasattr(mat, 'cpu') else mat)
+    s = scipy.linalg.svd(mat, compute_uv=False)
+    return (s.sum()**2)/(s*s).sum()
+
+
+def getCov(mat):
+    return mat.T @ mat
 
 
 @contextmanager
