@@ -589,7 +589,7 @@ def isymsqrtStable(cov: np.ndarray):
     return U[:, :rank] @ np.diag(1/np.sqrt(s[:rank])) @ Vh[:rank]
 
 
-def effRank(mat):
+def getIntrinsicDim(mat):
     mat = np.array(mat.cpu() if hasattr(mat, 'cpu') else mat)
     s = scipy.linalg.svd(mat, compute_uv=False)
     return (s.sum()**2)/(s*s).sum()
@@ -599,6 +599,13 @@ def getCov(mat):
     m = mat.shape[0]
     return mat.T @ mat / m
 
+def getMoment2(X):
+    vals = (X*X).sum(axis=1)
+    return vals.mean()
+
+def getMoment4(X):
+    vals = (X*X*X*X).sum(axis=1)
+    return vals.mean()
 
 @contextmanager
 def module_hook(hook: Callable):
