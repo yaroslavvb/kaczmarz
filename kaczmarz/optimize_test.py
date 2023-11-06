@@ -475,7 +475,6 @@ def test_linear_mnist(bias=True):
     dataset1 = datasets.MNIST('../data', train=True, download=True, transform=transform)
     dataset2 = datasets.MNIST('../data', train=False, download=True, transform=transform)
 
-
     model = u.SimpleFullyConnected([28 ** 2, 10], bias=bias)
     loss_fn = u.combined_nll_loss
 
@@ -516,10 +515,11 @@ def test_linear_mnist(bias=True):
         losses.append(getLoss(model))
 
     # [124.54545454545455, 83.3533919971775, 94.94022894752297, 71.47339670631018, 70.7996980888261, 29.232307191255543, 35.90959778157148, 46.41351659731431, 54.23867620820899, 55.18098633710972, 44.854006835682824, 39.05859527533705, 34.10272614522414, 33.8443342582746, 35.933635773983866, 36.40805794434114]
-    #golden_losses = [124.54545454545455, 83.3533919971775, 94.94022894752297, 71.47339670631018, 70.7996980888261, 29.232307191255543,
+    # golden_losses = [124.54545454545455, 83.3533919971775, 94.94022894752297, 71.47339670631018, 70.7996980888261, 29.232307191255543,
     #                 35.90959778157148, 46.41351659731431, 54.23867620820899, 55.18098633710972, 44.854006835682824, 39.05859527533705,
     #                 34.10272614522414, 33.8443342582746, 35.933635773983866, 36.40805794434114]
-    golden_losses = [2.302585, 2.295276, 2.204854, 2.163034, 2.097804, 2.037777, 2.050594, 2.029167, 2.055976, 2.030072, 1.998083, 2.033249, 2.042463, 2.067483, 2.089148, 2.056059]
+    golden_losses = [2.302585, 2.295276, 2.204854, 2.163034, 2.097804, 2.037777, 2.050594, 2.029167, 2.055976, 2.030072, 1.998083, 2.033249,
+                     2.042463, 2.067483, 2.089148, 2.056059]
 
     np.testing.assert_allclose(losses, golden_losses, rtol=1e-6, atol=1e-6)
 
@@ -722,26 +722,84 @@ def test_whitened_mnist():
     X, Y = next(iter(loader))
     X = X.double().reshape(-1, 28 * 28)
 
-    print("Ratio: ", kac.getMoment2(X)/kac.getMoment4(X))
+    print("Ratio: ", kac.getMoment2(X) / kac.getMoment4(X))
 
-    assert(kac.getIntrinsicDim(kac.getCov(X)) > 711)   # actual rank is slightly smaller than 712, maybe due to float32 downcast
+    assert (kac.getIntrinsicDim(kac.getCov(X)) > 711)  # actual rank is slightly smaller than 712, maybe due to float32 downcast
 
     # average norm squared is 1
     #    np.testing.assert_allclose(np.trace(kac.getCov(X)), 1, atol=1e-3, rtol=1e-3)
 
     # check that dataset is learning rate normalized
-    assert int(kac.getMoment2(X)/kac.getMoment4(X)) == 1
+    assert int(kac.getMoment2(X) / kac.getMoment4(X)) == 1
 
     dataset = kac.CustomMNIST(train=False, whiten_and_center=True)
     loader = torch.utils.data.DataLoader(dataset, batch_size=10000, shuffle=False)
     X, Y = next(iter(loader))
     X = X.double().reshape(-1, 28 * 28)
-    assert(int(kac.getIntrinsicDim(kac.getCov(X))) == 58)
+    assert (int(kac.getIntrinsicDim(kac.getCov(X))) == 58)
+
+def test_mnist_numpy_optimize():
+    dataset_size = 100
+
+    # optimize using built-in optimizer
+
+    #    torch.manual_seed(1)
+    do_squared_loss = True
+    loss_fn = u.least_squares_loss if do_squared_loss else u.combined_nll_loss
+    loss_type = 'LeastSquares' if do_squared_loss else 'CrossEntropy'
+
+    train_dataset = u.CustomMNIST(dataset_size=dataset_size, train=True, whiten_and_center=True, loss_type=loss_type)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=False)
+    train_loader_eval = torch.utils.data.DataLoader(train_dataset, batch_size=dataset_size, shuffle=False)
+
+    test_dataset = u.CustomMNIST(dataset_size=dataset_size, train=False, whiten_and_center=True, loss_type=loss_type)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=dataset_size)
+
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    model = kac.SimpleFullyConnected([28 ** 2, 10], hadamard_init=True)
+
+    optimizer = optim.SGD(model.parameters(), lr=1, momentum=0)
+
+    print(f"accuracy: train/test; loss: train/test")
+    for epoch in range(1, 10):
+        test_loss, test_acc = kac.evaluate_mnist(test_loader, model, do_squared_loss)
+        train_loss, train_acc = kac.evaluate_mnist(train_loader_eval, model, do_squared_loss)
+        print(f"accuracy: {train_acc:0.2f}/{test_acc:0.2f}, loss: {train_loss:.2f}/{test_loss:.2f}")
+
+        model.train()
+        for batch_idx, (data, target) in enumerate(train_loader):
+            data, target = data.to(device), target.to(device)
+            optimizer.zero_grad()
+            output = model(data)
+            loss = loss_fn(output, target)
+            loss.backward()
+            optimizer.step()
+
+    # np.testing.assert_allclose(test_acc, 0.583)
+    #    print(test_acc)
 
 
+    # golden_losses = [0.0460727, 0.048437, 0.0360559, 0.0472155, 0.046455, 0.0443264]
+    # numSteps = len(golden_losses) - 1
+    # for i in range(numSteps):
+    #     idx = i % m
+    #     a = A[idx:idx + 1, :]
+    #     y = a @ W
+    #     r = y - Y[idx:idx + 1]
+    #     g = numpy_kron(a.T, r)
+    #     W = W - g / (a * a).sum()
+    #     losses.extend([getLoss()])
+    #
+    # u.check_close(golden_losses, losses)
+    #
+    # dataset = kac.CustomMNIST(train=True, whiten_and_center=True)
+    # loader = torch.utils.data.DataLoader(dataset, batch_size=60000, shuffle=False)
+    # X, Y = next(iter(loader))
+    # X = X.double().reshape(-1, 28 * 28)
 
 
 if __name__ == '__main__':
     # test_d10_example()
-    test_d1000c_example()
+    # test_d1000c_example()
+    test_mnist_numpy_optimize()
     #    u.run_all_tests(sys.modules[__name__])

@@ -232,7 +232,7 @@ def least_squares_loss_add_classes(data: torch.Tensor, targets=None, reduction='
 def least_squares_loss(data: torch.Tensor, targets=None, reduction='mean', class_reduction='mean'):
     """Least squares loss (like MSELoss), but an extra 1/2 factor.
 
-    reduction and class_reduction determine whether to average or add batch elements/class elements respectively
+    reduction and class_reduction determine whether to average or add batch elements/class elements respectively.
     """
 
     assert is_matrix(data), f"Expected matrix, got {data.shape}"
@@ -308,7 +308,7 @@ class CustomMNIST(datasets.MNIST):
             data_width: dimension of input images
             dataset_size: number of examples, use for smaller subsets and running locally
             loss_type: if LeastSquares, then convert classes to one-hot format
-            normalize: if True, centers and whitens dataset
+            whiten_and_center: if True, centers and whitens dataset
         """
 
         if device is None:
@@ -329,7 +329,7 @@ class CustomMNIST(datasets.MNIST):
                 cov = getCov(A)
                 W = isymsqrtStable(cov)
 
-                B = A @ W
+                # B = A @ W
 
                 # 712 non-zero eigs, 60000 examples, normalize to have examples with unit norm on average
                 # W = W * np.sqrt(60000 / 712)
@@ -402,7 +402,7 @@ import torch.nn as nn
 class SimpleFullyConnected(nn.Module):
     """Simple feedforward network that works on images. """
 
-    def __init__(self, d: List[int], nonlin=False, bias=False, init_scale=0., last_layer_linear=False):
+    def __init__(self, d: List[int], nonlin=False, bias=False, init_scale=0., last_layer_linear=False, hadamard_init=False):
         """
         Feedfoward network of linear layers with optional ReLU nonlinearity. Stores linear layers in "layers" attr, ie
         model.layers[0] refers to first linear layer.
@@ -418,18 +418,32 @@ class SimpleFullyConnected(nn.Module):
         self.layers: List[nn.Module] = []
         self.all_layers: List[nn.Module] = []
         self.d: List[int] = d
+
         for i in range(len(d) - 1):
             linear = nn.Linear(d[i], d[i + 1], bias=bias)
 
             self.layers.append(linear)
             self.all_layers.append(linear)
 
-            # Initialize with ones
-            bigger = max(d[i + 1], d[i])
-            smaller = min(d[i + 1], d[i])
-            # linear.weight.data = torch.zeros((d[i + 1], d[i]))
-            eye = torch.eye(bigger)
-            linear.weight.data = init_scale * eye[:d[i + 1], :d[i]]
+            if hadamard_init:
+                # get num_vecs orthogonal vectors corresponding to the smaller dimension, embedding dimension is the larger
+                # since vectors need to be powers of two, pad remainder with 0s
+                orig_dim = max(d[i + 1], d[i])
+                num_vecs = min(d[i + 1], d[i])
+                dim = 2 ** math.floor(math.log2(orig_dim))
+                hadmat = scipy.linalg.hadamard(dim) / np.sqrt(dim)
+                hadmat = hadmat[:num_vecs]
+                hadmat = np.pad(hadmat, ((0, 0), (0, orig_dim - dim)), 'constant', constant_values=0)
+                hadmat = hadmat if d[i+1] <= d[i] else hadmat.T
+                hadmat = torch.from_numpy(hadmat)
+                linear.weight.data = hadmat.type(torch.get_default_dtype())
+            else:
+                # Initialize with identity
+                bigger = max(d[i + 1], d[i])
+                smaller = min(d[i + 1], d[i])
+                # linear.weight.data = torch.zeros((d[i + 1], d[i]))
+                eye = torch.eye(bigger)
+                linear.weight.data = init_scale * eye[:d[i + 1], :d[i]]
 
             if bias:
                 linear.bias.data = torch.zeros(d[i + 1])
@@ -665,6 +679,31 @@ def kaczmarz_grad_linear(layer: nn.Module, inputs: Tuple[torch.Tensor], output: 
     existing_hooks = output._backward_hooks
     assert existing_hooks is None, f"Tensor already has backward hooks, {existing_hooks}, potential bug if we forgot to remove previous hooks"
     output.register_hook(tensor_backwards)
+
+
+def evaluate_mnist(test_loader, model, do_squared_loss):
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    total_loss = 0
+    num_correct = 0
+    loss_fn = least_squares_loss if do_squared_loss else combined_nll_loss
+
+    model.eval()
+    with torch.no_grad():
+        for data, target in test_loader:
+            data, target = data.to(device), target.to(device)
+            output = model(data)
+            total_loss += loss_fn(output, target, reduction='sum').item()  # sum up batch loss
+            if do_squared_loss:
+                actual = target.argmax(dim=1, keepdim=True)
+                pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
+                num_correct += pred.eq(actual).sum().item()
+            else:
+                pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
+                num_correct += pred.eq(target.view_as(pred)).sum().item()
+
+    m = len(test_loader.dataset)
+    return total_loss / m, num_correct / m
 
 
 def run_all_tests(module: nn.Module):
