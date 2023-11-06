@@ -752,11 +752,7 @@ def test_whitened_mnist():
     assert (int(kac.getIntrinsicDim(kac.getCov(X))) == 58)
 
 def test_mnist_numpy_optimize():
-    dataset_size = 100
-
-    # optimize using built-in optimizer
-
-    #    torch.manual_seed(1)
+    dataset_size = 10
     do_squared_loss = True
     loss_fn = u.least_squares_loss if do_squared_loss else u.combined_nll_loss
     loss_type = 'LeastSquares' if do_squared_loss else 'CrossEntropy'
@@ -771,13 +767,22 @@ def test_mnist_numpy_optimize():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model = kac.SimpleFullyConnected([28 ** 2, 10], hadamard_init=True)
 
-    optimizer = optim.SGD(model.parameters(), lr=0.5, momentum=0)
+    max_lr = 0.4867711    # largest convergent LR for MNIST, see linear-estimation/Whiten MNIST
+    lr = max_lr / 2
 
-    print(f"accuracy: train/test; loss: train/test")
-    for epoch in range(1, 10):
+    lr = 1000
+    optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0)
+
+    #    print(f"accuracy: train/test; loss: train/test")
+    pytorch_losses = []
+    pytorch_gradnorms = []
+
+    def norm2(p): return (p*p).sum()
+
+    for epoch in range(1, 2):
         test_loss, test_acc = kac.evaluate_mnist(test_loader, model, do_squared_loss)
         train_loss, train_acc = kac.evaluate_mnist(train_loader_eval, model, do_squared_loss)
-        print(f"accuracy: {train_acc:0.2f}/{test_acc:0.2f}, loss: {train_loss:.2f}/{test_loss:.2f}")
+        # print(f"accuracy: {train_acc:0.2f}/{test_acc:0.2f}, loss: {train_loss:.2f}/{test_loss:.2f}")
 
         model.train()
         for batch_idx, (data, target) in enumerate(train_loader):
@@ -785,31 +790,44 @@ def test_mnist_numpy_optimize():
             optimizer.zero_grad()
             output = model(data)
             loss = loss_fn(output, target)
+            pytorch_losses.extend([loss.item()])
             loss.backward()
+            pytorch_gradnorms.extend([norm2(model.layers[0].weight.grad.data).item()])
             optimizer.step()
+            loss = loss_fn(output, target)
 
-    # np.testing.assert_allclose(test_acc, 0.583)
-    #    print(test_acc)
+    # print("Pytorch losses: ", pytorch_losses)
+    # print("πyTorch gradnorms: ", pytorch_gradnorms)
 
+    # run the training using numpy
+    model = kac.SimpleFullyConnected([28 ** 2, 10], hadamard_init=True)
 
-    # golden_losses = [0.0460727, 0.048437, 0.0360559, 0.0472155, 0.046455, 0.0443264]
-    # numSteps = len(golden_losses) - 1
-    # for i in range(numSteps):
-    #     idx = i % m
-    #     a = A[idx:idx + 1, :]
-    #     y = a @ W
-    #     r = y - Y[idx:idx + 1]
-    #     g = numpy_kron(a.T, r)
-    #     W = W - g / (a * a).sum()
-    #     losses.extend([getLoss()])
-    #
-    # u.check_close(golden_losses, losses)
-    #
-    # dataset = kac.CustomMNIST(train=True, whiten_and_center=True)
-    # loader = torch.utils.data.DataLoader(dataset, batch_size=60000, shuffle=False)
-    # X, Y = next(iter(loader))
-    # X = X.double().reshape(-1, 28 * 28)
+    # using "Multiclass layout notation, classes is the second dimension"
+    W = model.layers[0].weight.data.T
 
+    X, Y = train_dataset.data, train_dataset.targets
+    X = X.reshape(-1, 28*28)
+    m = X.shape[0]
+
+    numpy_losses = []
+    numpy_gradnorms = []
+    bs = 1
+    c = 10  # number of classes
+    for i in range(dataset_size):
+        idx = i % m
+        a = X[idx:idx + bs, :]
+        y = a @ W
+        r = y - Y[idx:idx + bs]
+        loss = 0.5 * (r**2).sum()/(bs * c)
+        # g = numpy_kron(a.T, r)
+        g = a.T @ r / (bs * c)
+        numpy_gradnorms.extend([norm2(g).item()])
+        W = W - lr * g
+        numpy_losses.extend([loss.item()])
+
+    # print("Numpy losses: ", numpy_losses)
+    # print("Numpy gradnorms: ", numpy_gradnorms)
+    np.testing.assert_allclose(pytorch_losses, numpy_losses, rtol=1e-3, atol=1e-5)
 
 if __name__ == '__main__':
     # test_d10_example()

@@ -337,26 +337,21 @@ class CustomMNIST(datasets.MNIST):
 
                 if os.path.exists(cached_whiten_fn):
                     W = np.load(cached_whiten_fn)
-                    print('total entries2: ', W.sum())
-                    np.testing.assert_allclose(W.sum(), -461.2285)
-                # compute it
+                    np.testing.assert_allclose(W.sum(), -461.2285), "Cached whitening matrix changed, delete it"   # sanity check
+
+                # compute whitening matrix from scratch
                 else:
                     data = self.data
                     data = data.reshape(data.shape[0], -1)
                     A = data - torch.mean(data.float(), dim=1, keepdim=True)
-                    #  cov = A.T @ A
                     cov = getCov(A)
                     W = isymsqrtStable(cov)
 
                     # 712 non-zero eigs, 60000 examples, normalize to have examples with unit norm on average
                     W = W / np.sqrt(712)
 
-                    # (optional)
-                    # normalize examples to have E[x^2]/E[x^4]=1, see "Adjustment for fourth-moment normalization" in linear-estimation.nb
-                    # W = W * 0.0184887
-
+                    np.testing.assert_allclose(W.sum(), -461.2285), "whitening signuature changed, update it?"
                     np.save(cached_whiten_fn, W)
-                    # 0.4867711938302488
 
                 CustomMNIST.mnistTrainWhiteningMatrix = torch.tensor(W, device='cpu')  # do on CPU because GPU numerics weren't tested
 
