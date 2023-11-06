@@ -785,9 +785,9 @@ def test_mnist_numpy_optimize():
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=dataset_size)
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model = kac.SimpleFullyConnected([28 ** 2, 10], hadamard_init=True)
+    model = kac.SimpleFullyConnected([28 ** 2, 10])
 
-    max_lr = 0.4867711    # largest convergent LR for MNIST, see linear-estimation/Whiten MNIST
+    max_lr = 0.4867711    # largest convergent LR for MNIST, see https://www.wolframcloud.com/obj/yaroslavvb/nn-linear/whitened-mnist.nb
     lr = max_lr / 2
 
     lr = 1000
@@ -820,9 +820,10 @@ def test_mnist_numpy_optimize():
     # print("πyTorch gradnorms: ", pytorch_gradnorms)
 
     # run the training using numpy
-    model = kac.SimpleFullyConnected([28 ** 2, 10], hadamard_init=True)
+    model = kac.SimpleFullyConnected([28 ** 2, 10])
 
-    # using "Multiclass layout notation, classes is the second dimension"
+    # using "Multiclass layout", classes is the second dimension"
+    # https://notability.com/n/2TQJ3NYAK7If1~xRfL26Ap
     W = model.layers[0].weight.data.T
 
     X, Y = train_dataset.data, train_dataset.targets
@@ -839,7 +840,6 @@ def test_mnist_numpy_optimize():
         y = a @ W
         r = y - Y[idx:idx + bs]
         loss = 0.5 * (r**2).sum()/(bs * c)
-        # g = numpy_kron(a.T, r)
         g = a.T @ r / (bs * c)
         numpy_gradnorms.extend([norm2(g).item()])
         W = W - lr * g
