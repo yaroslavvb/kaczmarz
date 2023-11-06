@@ -1,6 +1,7 @@
 import gc
 import inspect
 import math
+import os
 import sys
 import time
 from contextlib import contextmanager
@@ -21,6 +22,13 @@ mnistTrainWhiteningMatrix = None
 
 
 global_timeit_dict = {}
+
+# for line profiling
+try:
+    # noinspection PyUnboundLocalVariable
+    profile  # throws an exception when profile isn't defined
+except NameError:
+    profile = lambda x: x  # if it's not defined simply ignore the decorator.
 
 
 # Loads file from Github
@@ -321,22 +329,35 @@ class CustomMNIST(datasets.MNIST):
         if whiten_and_center:
             assert train or CustomMNIST.mnistTrainWhiteningMatrix is not None
 
+            root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+
             if CustomMNIST.mnistTrainWhiteningMatrix is None:
-                data = self.data
-                data = data.reshape(data.shape[0], -1)
-                A = data - torch.mean(data.float(), dim=1, keepdim=True)
-                #  cov = A.T @ A
-                cov = getCov(A)
-                W = isymsqrtStable(cov)
+                # load whitening matrix from file
+                cached_whiten_fn = root + '/data/mnistWhiten.npy'
 
-                # B = A @ W
+                if os.path.exists(cached_whiten_fn):
+                    W = np.load(cached_whiten_fn)
+                    print('total entries2: ', W.sum())
+                    np.testing.assert_allclose(W.sum(), -461.2285)
+                # compute it
+                else:
+                    data = self.data
+                    data = data.reshape(data.shape[0], -1)
+                    A = data - torch.mean(data.float(), dim=1, keepdim=True)
+                    #  cov = A.T @ A
+                    cov = getCov(A)
+                    W = isymsqrtStable(cov)
 
-                # 712 non-zero eigs, 60000 examples, normalize to have examples with unit norm on average
-                # W = W * np.sqrt(60000 / 712)
-                # W = W / np.sqrt(712)
+                    # 712 non-zero eigs, 60000 examples, normalize to have examples with unit norm on average
+                    W = W / np.sqrt(712)
 
-                # normalize examples to have E[x^2]/E[x^4]=1, see "Adjustment for fourth-moment normalization" in linear-estimation.nb
-                W = W * 0.0184887
+                    # (optional)
+                    # normalize examples to have E[x^2]/E[x^4]=1, see "Adjustment for fourth-moment normalization" in linear-estimation.nb
+                    # W = W * 0.0184887
+
+                    np.save(cached_whiten_fn, W)
+                    # 0.4867711938302488
+
                 CustomMNIST.mnistTrainWhiteningMatrix = torch.tensor(W, device='cpu')  # do on CPU because GPU numerics weren't tested
 
         if dataset_size > 0:

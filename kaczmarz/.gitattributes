@@ -1,0 +1,17 @@
+../data/d1000-Y.npy filter=lfs diff=lfs merge=lfs -text
+../data/mnist.npy filter=lfs diff=lfs merge=lfs -text
+../data/mnistTest-labels.npy filter=lfs diff=lfs merge=lfs -text
+../data/mnistTrain-labels.npy filter=lfs diff=lfs merge=lfs -text
+../data/d10-Y.npy filter=lfs diff=lfs merge=lfs -text
+../data/d1000c-A.npy filter=lfs diff=lfs merge=lfs -text
+../data/mnistTest.npy filter=lfs diff=lfs merge=lfs -text
+../data/mnistTestW.npy filter=lfs diff=lfs merge=lfs -text
+../data/mnistWhiten.npy filter=lfs diff=lfs merge=lfs -text
+../data/toy-A.npy filter=lfs diff=lfs merge=lfs -text
+../data/-mnistWhiten.npy filter=lfs diff=lfs merge=lfs -text
+../data/d10-A.npy filter=lfs diff=lfs merge=lfs -text
+../data/d1000c-Y.npy filter=lfs diff=lfs merge=lfs -text
+../data/mnistTrainW.npy filter=lfs diff=lfs merge=lfs -text
+../data/toy-Y.npy filter=lfs diff=lfs merge=lfs -text
+../data/d1000-A.npy filter=lfs diff=lfs merge=lfs -text
+../data/mnistTrain.npy filter=lfs diff=lfs merge=lfs -text

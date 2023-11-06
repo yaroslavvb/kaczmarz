@@ -1,6 +1,7 @@
 from typing import Tuple
 
 import numpy as np
+import pytest
 from torch.utils import tensorboard
 
 import kac
@@ -21,6 +22,14 @@ root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 def numpy_kron(a, b):
     result = u.kron(u.from_numpy(a), u.from_numpy(b))
     return u.to_numpy(result)
+
+
+# for line profiling
+try:
+    # noinspection PyUnboundLocalVariable
+    profile  # throws an exception when profile isn't defined
+except NameError:
+    profile = lambda x: x  # if it's not defined simply ignore the decorator.
 
 
 def test_toy_multiclass_example():
@@ -691,19 +700,23 @@ def test_prewhitened_mnist():
     np.testing.assert_allclose((means * means).sum(), 0, atol=1e-6)
 
 
+@pytest.mark.slow
 def test_whitening():
     """Following values from "Whiten MNIST" of linear-estimation.nb, and tolga-mnist-whitening"""
 
     dataset = kac.CustomMNIST()
-    loader = torch.utils.data.DataLoader(dataset, batch_size=60000, shuffle=False)
-    X, Y = next(iter(loader))
+    # loader = torch.utils.data.DataLoader(dataset, batch_size=60000, shuffle=False)
+    # X, Y = next(iter(loader))
+    X, Y = dataset.data, dataset.targets
+
     X = X.double().reshape(-1, 28 * 28)
 
     cov = kac.getCov(X).cpu().numpy()
     np.testing.assert_allclose(kac.getIntrinsicDim(cov), 5.044191669053714)
 
     whiten = kac.isymsqrtStable(cov)
-    cov = kac.getCov(X @ whiten)
+    X2 = X @ whiten
+    cov = kac.getCov(X2)
     np.testing.assert_allclose(kac.getIntrinsicDim(cov), 712)
 
     # after centering each example
@@ -716,21 +729,21 @@ def test_whitening():
     np.testing.assert_allclose(kac.getIntrinsicDim(cov), 712)
 
 
+@pytest.mark.slow
 def test_whitened_mnist():
     dataset = kac.CustomMNIST(train=True, whiten_and_center=True)
     loader = torch.utils.data.DataLoader(dataset, batch_size=60000, shuffle=False)
-    X, Y = next(iter(loader))
-    X = X.double().reshape(-1, 28 * 28)
+    #    X, Y = next(iter(loader))
+    X, Y = dataset.data, dataset.targets
 
-    print("Ratio: ", kac.getMoment2(X) / kac.getMoment4(X))
+    X = X.double().reshape(-1, 28 * 28)
 
     assert (kac.getIntrinsicDim(kac.getCov(X)) > 711)  # actual rank is slightly smaller than 712, maybe due to float32 downcast
 
     # average norm squared is 1
-    #    np.testing.assert_allclose(np.trace(kac.getCov(X)), 1, atol=1e-3, rtol=1e-3)
+    np.testing.assert_allclose(np.trace(kac.getCov(X)), 1, atol=1e-3, rtol=1e-3)
 
-    # check that dataset is learning rate normalized
-    assert int(kac.getMoment2(X) / kac.getMoment4(X)) == 1
+    # print("Ratio: ", kac.getMoment2(X) / kac.getMoment4(X))
 
     dataset = kac.CustomMNIST(train=False, whiten_and_center=True)
     loader = torch.utils.data.DataLoader(dataset, batch_size=10000, shuffle=False)
@@ -758,7 +771,7 @@ def test_mnist_numpy_optimize():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model = kac.SimpleFullyConnected([28 ** 2, 10], hadamard_init=True)
 
-    optimizer = optim.SGD(model.parameters(), lr=1, momentum=0)
+    optimizer = optim.SGD(model.parameters(), lr=0.5, momentum=0)
 
     print(f"accuracy: train/test; loss: train/test")
     for epoch in range(1, 10):
@@ -801,5 +814,7 @@ def test_mnist_numpy_optimize():
 if __name__ == '__main__':
     # test_d10_example()
     # test_d1000c_example()
-    test_mnist_numpy_optimize()
+    # test_mnist_numpy_optimize()
+    #  test_whitening()
+    test_whitened_mnist()
     #    u.run_all_tests(sys.modules[__name__])
