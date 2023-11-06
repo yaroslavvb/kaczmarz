@@ -731,6 +731,7 @@ def test_whitening():
 
 @pytest.mark.slow
 def test_whitened_mnist():
+    """Sanity check for whitened MNIST, see https://www.wolframcloud.com/obj/yaroslavvb/nn-linear/whitened-mnist.nb"""
     dataset = kac.CustomMNIST(train=True, whiten_and_center=True)
     loader = torch.utils.data.DataLoader(dataset, batch_size=60000, shuffle=False)
     #    X, Y = next(iter(loader))
@@ -743,8 +744,27 @@ def test_whitened_mnist():
     # average norm squared is 1
     np.testing.assert_allclose(np.trace(kac.getCov(X)), 1, atol=1e-3, rtol=1e-3)
 
-    # print("Ratio: ", kac.getMoment2(X) / kac.getMoment4(X))
+    # full batch convergence happens in 1 step using learning rate 712
+    (m, n) = X.shape
+    w0 = kac.v2c(torch.zeros(n, dtype=torch.double))
+    yopt = kac.v2c(torch.ones(m))
 
+    lr = 712
+
+    w = w0
+    y = X @ w
+    r = y - yopt
+    loss = 0.5 * kac.norm2(r)/m
+    np.testing.assert_allclose(loss, 0.5)
+
+    g = X.T @ r / m
+    w = w - lr * g
+    y = X @ w
+    r = y - yopt
+    loss = 0.5 * kac.norm2(r)/m
+    np.testing.assert_allclose(loss, 0.0265, atol=1e-5, rtol=1e-5)
+
+    # check the test dataset
     dataset = kac.CustomMNIST(train=False, whiten_and_center=True)
     loader = torch.utils.data.DataLoader(dataset, batch_size=10000, shuffle=False)
     X, Y = next(iter(loader))

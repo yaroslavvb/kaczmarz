@@ -628,6 +628,27 @@ def getMoment4(X):
     vals = (X*X*X*X).sum(axis=1)
     return vals.mean()
 
+
+def v2c(vec: torch.Tensor) -> torch.Tensor:
+    """Convert vector to column matrix."""
+    assert len(vec.shape) == 1
+    return torch.unsqueeze(vec, 1)
+
+def v2r(vec: torch.Tensor) -> torch.Tensor:
+    """Converts rank-1 tensor to row matrix"""
+    assert len(vec.shape) == 1
+    return vec.unsqueeze(0)
+
+def c2v(col: torch.Tensor) -> torch.Tensor:
+    """Convert column matrix into vector."""
+    assert len(col.shape) == 2
+    assert col.shape[1] == 1
+    return torch.reshape(col, [-1])
+
+def norm2(x):
+    y = x.flatten()
+    return (y*y).sum()
+
 @contextmanager
 def module_hook(hook: Callable):
     handle = nn.modules.module.register_module_forward_hook(hook, always_call=True)
