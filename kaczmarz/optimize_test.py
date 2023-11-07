@@ -4,9 +4,9 @@ import numpy as np
 import pytest
 from torch.utils import tensorboard
 
-import kac
+import kaczmarz_util
 
-u = kac
+u = kaczmarz_util
 
 import torch.nn as nn
 import torch.nn.functional as F
@@ -704,72 +704,72 @@ def test_prewhitened_mnist():
 def test_whitening():
     """Following values from "Whiten MNIST" of linear-estimation.nb, and tolga-mnist-whitening"""
 
-    dataset = kac.CustomMNIST()
+    dataset = u.CustomMNIST()
     # loader = torch.utils.data.DataLoader(dataset, batch_size=60000, shuffle=False)
     # X, Y = next(iter(loader))
     X, Y = dataset.data, dataset.targets
 
     X = X.double().reshape(-1, 28 * 28)
 
-    cov = kac.getCov(X).cpu().numpy()
-    np.testing.assert_allclose(kac.getIntrinsicDim(cov), 5.044191669053714)
+    cov = u.getCov(X).cpu().numpy()
+    np.testing.assert_allclose(u.getIntrinsicDim(cov), 5.044191669053714)
 
-    whiten = kac.isymsqrtStable(cov)
+    whiten = kaczmarz_util.isymsqrtStable(cov)
     X2 = X @ whiten
-    cov = kac.getCov(X2)
-    np.testing.assert_allclose(kac.getIntrinsicDim(cov), 712)
+    cov = kaczmarz_util.getCov(X2)
+    np.testing.assert_allclose(u.getIntrinsicDim(cov), 712)
 
     # after centering each example
     X = X - X.mean(dim=1, keepdim=True)
-    cov = kac.getCov(X).cpu().numpy()
-    np.testing.assert_allclose(kac.getIntrinsicDim(cov), 8.43133453309047)
+    cov = kaczmarz_util.getCov(X).cpu().numpy()
+    np.testing.assert_allclose(kaczmarz_util.getIntrinsicDim(cov), 8.43133453309047)
 
-    whiten = kac.isymsqrtStable(cov)
-    cov = kac.getCov(X @ whiten)
-    np.testing.assert_allclose(kac.getIntrinsicDim(cov), 712)
+    whiten = kaczmarz_util.isymsqrtStable(cov)
+    cov = u.getCov(X @ whiten)
+    np.testing.assert_allclose(kaczmarz_util.getIntrinsicDim(cov), 712)
 
 
 @pytest.mark.slow
 def test_whitened_mnist():
     """Sanity check for whitened MNIST, see https://www.wolframcloud.com/obj/yaroslavvb/nn-linear/whitened-mnist.nb"""
-    dataset = kac.CustomMNIST(train=True, whiten_and_center=True)
+    dataset = u.CustomMNIST(train=True, whiten_and_center=True)
     loader = torch.utils.data.DataLoader(dataset, batch_size=60000, shuffle=False)
     #    X, Y = next(iter(loader))
     X, Y = dataset.data, dataset.targets
 
     X = X.double().reshape(-1, 28 * 28)
 
-    assert (kac.getIntrinsicDim(kac.getCov(X)) > 711)  # actual rank is slightly smaller than 712, maybe due to float32 downcast
+    assert (u.getIntrinsicDim(u.getCov(X)) > 711)  # actual rank is slightly smaller than 712, maybe due to float32 downcast
 
     # average norm squared is 1
-    np.testing.assert_allclose(np.trace(kac.getCov(X)), 1, atol=1e-3, rtol=1e-3)
+    np.testing.assert_allclose(np.trace(u.getCov(X)), 1, atol=1e-3, rtol=1e-3)
 
     # full batch convergence happens in 1 step using learning rate 712
     (m, n) = X.shape
-    w0 = kac.v2c(torch.zeros(n, dtype=torch.double))
-    yopt = kac.v2c(torch.ones(m))
+    w0 = kaczmarz_util.v2c(torch.zeros(n, dtype=torch.double))
+    yopt = kaczmarz_util.v2c(torch.ones(m))
 
     lr = 712
 
     w = w0
     y = X @ w
     r = y - yopt
-    loss = 0.5 * kac.norm2(r)/m
+    loss = 0.5 * kaczmarz_util.norm2(r) / m
     np.testing.assert_allclose(loss, 0.5)
 
     g = X.T @ r / m
     w = w - lr * g
     y = X @ w
     r = y - yopt
-    loss = 0.5 * kac.norm2(r)/m
+    loss = 0.5 * kaczmarz_util.norm2(r) / m
     np.testing.assert_allclose(loss, 0.0265, atol=1e-5, rtol=1e-5)
 
     # check the test dataset
-    dataset = kac.CustomMNIST(train=False, whiten_and_center=True)
+    dataset = kaczmarz_util.CustomMNIST(train=False, whiten_and_center=True)
     loader = torch.utils.data.DataLoader(dataset, batch_size=10000, shuffle=False)
     X, Y = next(iter(loader))
     X = X.double().reshape(-1, 28 * 28)
-    assert (int(kac.getIntrinsicDim(kac.getCov(X))) == 58)
+    assert (int(kaczmarz_util.getIntrinsicDim(kaczmarz_util.getCov(X))) == 58)
 
 def test_mnist_numpy_optimize():
     dataset_size = 10
@@ -785,7 +785,7 @@ def test_mnist_numpy_optimize():
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=dataset_size)
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model = kac.SimpleFullyConnected([28 ** 2, 10])
+    model = u.SimpleFullyConnected([28 ** 2, 10])
 
     # largest convergent LR for MNIST, see https://www.wolframcloud.com/obj/yaroslavvb/nn-linear/whitened-mnist.nb
     # max_lr = 0.4867711
@@ -799,8 +799,8 @@ def test_mnist_numpy_optimize():
     def norm2(p): return (p*p).sum()
 
     for epoch in range(1, 2):
-        test_loss, test_acc = kac.evaluate_mnist(test_loader, model, do_squared_loss)
-        train_loss, train_acc = kac.evaluate_mnist(train_loader_eval, model, do_squared_loss)
+        test_loss, test_acc = kaczmarz_util.evaluate_mnist(test_loader, model, do_squared_loss)
+        train_loss, train_acc = kaczmarz_util.evaluate_mnist(train_loader_eval, model, do_squared_loss)
         # print(f"accuracy: {train_acc:0.2f}/{test_acc:0.2f}, loss: {train_loss:.2f}/{test_loss:.2f}")
 
         model.train()
@@ -818,7 +818,7 @@ def test_mnist_numpy_optimize():
     # print("πyTorch gradnorms: ", pytorch_gradnorms)
 
     # run the training using numpy
-    model = kac.SimpleFullyConnected([28 ** 2, 10])
+    model = kaczmarz_util.SimpleFullyConnected([28 ** 2, 10])
 
     # using "Multiclass layout", classes is the second dimension"
     # https://notability.com/n/2TQJ3NYAK7If1~xRfL26Ap

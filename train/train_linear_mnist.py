@@ -5,9 +5,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-import kaczmarz.kac as kac
+import kaczmarz.kaczmarz_util as u2
 
-u = kac
+u = u2
 
 class Net(nn.Module):
     def __init__(self, d0):
@@ -38,12 +38,12 @@ def train_pytorch():
     # do_squared_loss = False
     do_squared_loss = True
     loss_type = 'LeastSquares' if do_squared_loss else 'CrossEntropy'
-    loss_fn = kac.least_squares_loss if do_squared_loss else kac.combined_nll_loss
+    loss_fn = u2.least_squares_loss if do_squared_loss else u2.combined_nll_loss
 
-    train_dataset = kac.CustomMNIST(train=True, loss_type=loss_type, whiten_and_center=True, dataset_size=dataset_size)
+    train_dataset = u2.CustomMNIST(train=True, loss_type=loss_type, whiten_and_center=True, dataset_size=dataset_size)
     train_loader = torch.utils.data.DataLoader(train_dataset, **train_kwargs)
 
-    test_dataset = kac.CustomMNIST(train=False, loss_type=loss_type, whiten_and_center=True, dataset_size=dataset_size)
+    test_dataset = u2.CustomMNIST(train=False, loss_type=loss_type, whiten_and_center=True, dataset_size=dataset_size)
 
     model = Net(d0=28 * 28).to(device)
 
@@ -76,7 +76,7 @@ def train_pytorch():
             data, target = data.to(device), target.to(device)
             optimizer.zero_grad()
             if do_kaczmarz:
-                with kac.module_hook(kac.kaczmarz_grad_linear):
+                with u2.module_hook(u2.kaczmarz_grad_linear):
                     output = model(data)
             else:
                 output = model(data)
@@ -84,7 +84,7 @@ def train_pytorch():
             loss.backward()
 
             if do_kaczmarz:
-                kac.copy_custom_grad_to_grad(model)
+                u2.copy_custom_grad_to_grad(model)
 
             optimizer.step()
 
@@ -139,8 +139,8 @@ def train_numpy(use_kaczmarz=False):
 
         if i % eval_interval == 0:
             model.layers[0].weight.data = W.T
-            train_loss, _ = kac.evaluate_mnist(train_loader_eval, model, True)
-            test_loss, _ = kac.evaluate_mnist(test_loader, model, True)
+            train_loss, _ = u2.evaluate_mnist(train_loader_eval, model, True)
+            test_loss, _ = u2.evaluate_mnist(test_loader, model, True)
             print(f"loss: {train_loss:.4f}/{test_loss:.4f}")
 
 

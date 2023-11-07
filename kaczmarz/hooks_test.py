@@ -6,7 +6,7 @@ import torch.nn as nn
 
 import numpy as np
 
-import kac as u
+import kaczmarz_util as u
 
 def test_global_forward_hook():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'

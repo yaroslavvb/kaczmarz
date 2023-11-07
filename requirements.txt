@@ -20,3 +20,4 @@ pillow
 six
 wandb
 scipy
+setuptools

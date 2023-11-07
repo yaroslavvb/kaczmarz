@@ -1,12 +1,9 @@
 import os
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
-
 import numpy as np
+import torch
 
-import kaczmarz.kac as kac
+import kaczmarz.kaczmarz_util as kac
 
 root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 

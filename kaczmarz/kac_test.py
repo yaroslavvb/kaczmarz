@@ -1,18 +1,13 @@
-# Small unit tests for utilities in kac.py
+# Small unit tests for utilities in kaczmarz_util.py
 import math
-import sys
 
 import numpy as np
-# import torch
 import pytest
 import torch
-# import wandb
 from torch.utils import tensorboard
 
-import kac
-import kac as u
+import kaczmarz_util as u
 
-u = kac
 
 def test_kron():
     """Test kron, vec and vecr identities"""
@@ -70,9 +65,6 @@ def test_simple_fully_connected():
     assert torch.allclose(net(image), torch.tensor([[1., 1., 0., 0., 0., 0., 0., 0., 0., 0.]]))
 
 def test_custom_mnist():
-    dataset1 = u.CustomMNIST(train=True, )
-    dataset2 = u.CustomMNIST(train=False)
-
     dataset1 = u.CustomMNIST(data_width=28, dataset_size=100, train=True, loss_type='CrossEntropy')
     dataset2 = u.CustomMNIST(data_width=28, dataset_size=100, train=False, loss_type='CrossEntropy')
 
@@ -107,7 +99,7 @@ def test_custom_mnist():
 def test_isymsqrtStable():
     X = np.array([[1, 2], [3, 4]])
     cov = X.T @ X
-    whiten = kac.isymsqrtStable(cov)
+    whiten = u.isymsqrtStable(cov)
 
     Y = X @ whiten
     covW = Y.T @ Y
@@ -115,5 +107,5 @@ def test_isymsqrtStable():
 
 
 if __name__ == '__main__':
-    # test_kron()
-    u.run_all_tests(sys.modules[__name__])
+    test_kron()
+    # u.run_all_tests(sys.modules[__name__])
