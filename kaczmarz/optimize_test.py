@@ -787,15 +787,14 @@ def test_mnist_numpy_optimize():
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     model = kac.SimpleFullyConnected([28 ** 2, 10])
 
-    max_lr = 0.4867711    # largest convergent LR for MNIST, see https://www.wolframcloud.com/obj/yaroslavvb/nn-linear/whitened-mnist.nb
-    lr = max_lr / 2
+    # largest convergent LR for MNIST, see https://www.wolframcloud.com/obj/yaroslavvb/nn-linear/whitened-mnist.nb
+    # max_lr = 0.4867711
+    # lr = max_lr / 2
 
     lr = 1000
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0)
 
-    #    print(f"accuracy: train/test; loss: train/test")
     pytorch_losses = []
-    pytorch_gradnorms = []
 
     def norm2(p): return (p*p).sum()
 
@@ -812,7 +811,6 @@ def test_mnist_numpy_optimize():
             loss = loss_fn(output, target)
             pytorch_losses.extend([loss.item()])
             loss.backward()
-            pytorch_gradnorms.extend([norm2(model.layers[0].weight.grad.data).item()])
             optimizer.step()
             loss = loss_fn(output, target)
 
@@ -841,13 +839,13 @@ def test_mnist_numpy_optimize():
         r = y - Y[idx:idx + bs]
         loss = 0.5 * (r**2).sum()/(bs * c)
         g = a.T @ r / (bs * c)
-        numpy_gradnorms.extend([norm2(g).item()])
         W = W - lr * g
         numpy_losses.extend([loss.item()])
 
     # print("Numpy losses: ", numpy_losses)
     # print("Numpy gradnorms: ", numpy_gradnorms)
     np.testing.assert_allclose(pytorch_losses, numpy_losses, rtol=1e-3, atol=1e-5)
+
 
 if __name__ == '__main__':
     # test_d10_example()

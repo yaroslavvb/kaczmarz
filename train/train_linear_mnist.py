@@ -7,6 +7,7 @@ import torch.optim as optim
 
 import kaczmarz.kac as kac
 
+u = kac
 
 class Net(nn.Module):
     def __init__(self, d0):
@@ -23,9 +24,9 @@ class Net(nn.Module):
 root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 
-def main():
-    do_kaczmarz = True
+def train_pytorch():
     do_kaczmarz = False
+    do_kaczmarz = True
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     torch.manual_seed(1)
@@ -92,5 +93,60 @@ def main():
             f"accuracy: {correct / total:0.2f}, test_loss: {test_loss:.2f}, old train loss: {loss.item():.2f}, new train loss: {new_loss.item():.2f}")
 
 
+def train_numpy(use_kaczmarz=False):
+    model = u.SimpleFullyConnected([28 ** 2, 10])
+    W = model.layers[0].weight.data.T
+
+    # largest convergent LR for MNIST SGD, see https://www.wolframcloud.com/obj/yaroslavvb/nn-linear/whitened-mnist.nb
+    max_lr = 0.4867711
+    lr = 1 if use_kaczmarz else max_lr
+
+    # using "Multiclass layout", classes is the second dimension"
+    # https://notability.com/n/2TQJ3NYAK7If1~xRfL26Ap
+
+    dataset_size = 10000
+    loss_fn = u.least_squares_loss
+    loss_type = 'LeastSquares'
+    bs = 1   # batch size
+    c = 10   # number of classes
+
+    train_dataset = u.CustomMNIST(dataset_size=dataset_size, train=True, whiten_and_center=True, loss_type=loss_type)
+    train_loader_eval = torch.utils.data.DataLoader(train_dataset, batch_size=dataset_size)
+
+    test_dataset = u.CustomMNIST(dataset_size=dataset_size, train=False, whiten_and_center=True, loss_type=loss_type)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=dataset_size)
+
+    X, Y = train_dataset.data, train_dataset.targets
+    X = X.reshape(-1, 28*28)
+    m, n = X.shape
+
+    losses = []
+    num_steps = 10000
+    eval_interval = 1000
+
+    print(f"loss: train/test")
+
+    for i in range(num_steps):
+        idx = i % m
+        a = X[idx:idx + bs, :]
+        y = a @ W
+        r = y - Y[idx:idx + bs]
+        loss = 0.5 * (r**2).sum()/(bs * c)
+        g = a.T @ r / (bs * c)
+        normalizer = 1/u.norm2(a) if use_kaczmarz else 1
+        W = W - lr * g * normalizer
+        losses.extend([loss.item()])
+
+        if i % eval_interval == 0:
+            model.layers[0].weight.data = W.T
+            train_loss, _ = kac.evaluate_mnist(train_loader_eval, model, True)
+            test_loss, _ = kac.evaluate_mnist(test_loader, model, True)
+            print(f"loss: {train_loss:.4f}/{test_loss:.4f}")
+
+
 if __name__ == '__main__':
-    main()
+    print("SGD")
+    train_numpy(use_kaczmarz=False)
+    print("\nKaczmarz")
+    train_numpy(use_kaczmarz=True)
+
