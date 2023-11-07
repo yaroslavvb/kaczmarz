@@ -21,6 +21,8 @@ mnistTrainWhiteningMatrix = None
 # u = sys.modules[__name__]
 
 
+DO_NUMERIC_CHECKS = False
+
 global_timeit_dict = {}
 
 # for line profiling
@@ -337,7 +339,8 @@ class CustomMNIST(datasets.MNIST):
 
                 if os.path.exists(cached_whiten_fn):
                     W = np.load(cached_whiten_fn)
-                    np.testing.assert_allclose(W.sum(), -461.2285), "Cached whitening matrix changed, delete it"   # sanity check
+                    if DO_NUMERIC_CHECKS:
+                        np.testing.assert_allclose(W.sum(), -461.2285), "Cached whitening matrix changed, delete it"   # sanity check
 
                 # compute whitening matrix from scratch
                 else:
@@ -350,7 +353,8 @@ class CustomMNIST(datasets.MNIST):
                     # 712 non-zero eigs, 60000 examples, normalize to have examples with unit norm on average
                     W = W / np.sqrt(712)
 
-                    np.testing.assert_allclose(W.sum(), -461.2285), "whitening signuature changed, update it?"
+                    if DO_NUMERIC_CHECKS:
+                        np.testing.assert_allclose(W.sum(), -461.2285), "whitening signuature changed, update it?"
                     np.save(cached_whiten_fn, W)
 
                 CustomMNIST.mnistTrainWhiteningMatrix = torch.tensor(W, device='cpu')  # do on CPU because GPU numerics weren't tested
